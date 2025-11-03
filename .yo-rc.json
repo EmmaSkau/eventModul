@@ -1,0 +1,18 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "18.17.1",
+    "sdksVersions": {},
+    "version": "1.21.1",
+    "libraryName": "event-modul",
+    "libraryId": "b812c0b3-bc7e-4d15-8f55-ef5281315268",
+    "environment": "spo",
+    "packageManager": "npm",
+    "solutionName": "event-modul",
+    "solutionShortDescription": "event-modul description",
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "componentType": "webpart"
+  }
+}
