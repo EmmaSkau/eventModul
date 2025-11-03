@@ -1,4 +1,4 @@
-{
+  {
   "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
   "solution": {
     "name": "event-modul-client-side-solution",
@@ -8,10 +8,10 @@
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
     "developer": {
-      "name": "",
-      "websiteUrl": "",
-      "privacyUrl": "",
-      "termsOfUseUrl": "",
+      "name": "Malene & Emma",
+      "privacyUrl": "https://ngage.dk/privacy",
+      "termsOfUseUrl": "https://ngage.dk/termsofuse",
+      "websiteUrl": "https://ngage.dk/komponenter/index",
       "mpnId": "Undefined-1.21.1"
     },
     "metadata": {
