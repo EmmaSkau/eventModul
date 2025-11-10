@@ -1,41 +1,73 @@
-import * as React from 'react';
-import styles from './EventModul.module.scss';
-import type { IEventModulProps } from './IEventModulProps';
-import { escape } from '@microsoft/sp-lodash-subset';
+import * as React from "react";
+import styles from "./EventModul.module.scss";
+import type { IEventModulProps } from "./IEventModulProps";
+import { escape } from "@microsoft/sp-lodash-subset";
+import { PrimaryButton, ActionButton, IIconProps } from "@fluentui/react";
+import CreateEvent from "./CreateEvent";
 
-export default class EventModul extends React.Component<IEventModulProps> {
+interface IEventModulState {
+  showCreateEvent: boolean;
+}
+
+export default class EventModul extends React.Component<IEventModulProps, IEventModulState> {
+  constructor(props: IEventModulProps) {
+    super(props);
+    this.state = {
+      showCreateEvent: false
+    };
+  }
+
+  private handleCreateEvent = (): void => {
+    this.setState({ showCreateEvent: true });
+  };
+
+  private handleCloseCreateEvent = (): void => {
+    this.setState({ showCreateEvent: false });
+  };
+  
   public render(): React.ReactElement<IEventModulProps> {
-    const {
-      description,
-      isDarkTheme,
-      environmentMessage,
-      hasTeamsContext,
-      userDisplayName
-    } = this.props;
+    const { hasTeamsContext, userDisplayName } = this.props;
+
+    const monthIcon: IIconProps = { iconName: "Calendar" };
+    const thisYearIcon: IIconProps = { iconName: "CalendarYear" };
 
     return (
-      <section className={`${styles.eventModul} ${hasTeamsContext ? styles.teams : ''}`}>
+      <section
+        className={`${styles.eventModul} ${
+          hasTeamsContext ? styles.teams : ""
+        }`}
+      >
         <div className={styles.welcome}>
-          <img alt="" src={isDarkTheme ? require('../assets/welcome-dark.png') : require('../assets/welcome-light.png')} className={styles.welcomeImage} />
-          <h2>Well done, {escape(userDisplayName)}!</h2>
-          <div>{environmentMessage}</div>
-          <div>Web part property value: <strong>{escape(description)}</strong></div>
+          <h2>{escape(userDisplayName)}s Events</h2>
+          <p>Her kan du se alle dine events og oprette ny events</p>
         </div>
+
+        <PrimaryButton 
+          text="Opret ny event" 
+          onClick={this.handleCreateEvent}
+        />
+
+        {this.state.showCreateEvent && (
+          <CreateEvent onClose={this.handleCloseCreateEvent} />
+        )}
+
         <div>
-          <h3>Welcome to SharePoint Framework!</h3>
-          <p>
-            The SharePoint Framework (SPFx) is a extensibility model for Microsoft Viva, Microsoft Teams and SharePoint. It&#39;s the easiest way to extend Microsoft 365 with automatic Single Sign On, automatic hosting and industry standard tooling.
-          </p>
-          <h4>Learn more about SPFx development:</h4>
-          <ul className={styles.links}>
-            <li><a href="https://aka.ms/spfx" target="_blank" rel="noreferrer">SharePoint Framework Overview</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-graph" target="_blank" rel="noreferrer">Use Microsoft Graph in your solution</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-teams" target="_blank" rel="noreferrer">Build for Microsoft Teams using SharePoint Framework</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-viva" target="_blank" rel="noreferrer">Build for Microsoft Viva Connections using SharePoint Framework</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-store" target="_blank" rel="noreferrer">Publish SharePoint Framework applications to the marketplace</a></li>
-            <li><a href="https://aka.ms/spfx-yeoman-api" target="_blank" rel="noreferrer">SharePoint Framework API reference</a></li>
-            <li><a href="https://aka.ms/m365pnp" target="_blank" rel="noreferrer">Microsoft 365 Developer Community</a></li>
-          </ul>
+          <ActionButton
+            iconProps={monthIcon}
+            allowDisabledFocus
+            disabled={false}
+            checked={false}
+          >
+            Denne måned
+          </ActionButton>
+          <ActionButton
+            iconProps={thisYearIcon}
+            allowDisabledFocus
+            disabled={false}
+            checked={false}
+          >
+            Dette år
+          </ActionButton>
         </div>
       </section>
     );
