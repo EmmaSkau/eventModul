@@ -32,3 +32,26 @@
     }
   }
 }
+
+// FILTERING STYLES
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.filters > * {
+  flex: 1 1 calc(33.33% - 20px); // Hvert element fylder 1/3 af pladsen minus gap
+  box-sizing: border-box; // Sikrer, at padding og border inkluderes i elementets bredde
+}
+
+.filterToggle {
+    display: flex;
+    gap: 50px;
+    align-items: center;
+}
+
+.restFilter {
+  margin-left: auto;
+}
