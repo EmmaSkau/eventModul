@@ -15,6 +15,7 @@ import { getSP } from "../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
+import ListView from "./ListView";
 
 interface ILocationItem {
   Placering: string;
@@ -62,16 +63,16 @@ export default class EventModul extends React.Component<
       this.setState({ isLoadingLocations: true });
       const sp = getSP(this.props.context);
 
+      // Get all items with Placering field (Location field can't be filtered in query)
       const items: ILocationItem[] = await sp.web.lists
         .getByTitle("EventDB")
-        .items.select("Placering")
-        .filter("Placering ne null")();
+        .items.select("Placering")();
 
       console.log("Loaded items from SharePoint:", items);
 
       const locations = items
         .map((item: ILocationItem) => item.Placering)
-        .filter((location: string) => location);
+        .filter((location: string) => location); // Filter out null/empty in JavaScript
       const uniqueLocations: string[] = [];
       const seen: { [key: string]: boolean } = {};
       for (const location of locations) {
@@ -196,6 +197,9 @@ export default class EventModul extends React.Component<
             onClick={this.resetFilters}
           />
         </section>
+
+        <h2>Fremtidige events:</h2>
+        <ListView context={this.props.context} />
       </section>
     );
   }
