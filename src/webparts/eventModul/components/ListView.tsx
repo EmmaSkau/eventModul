@@ -16,6 +16,7 @@ import {
   MessageBarType,
   PrimaryButton,
 } from "@fluentui/react";
+import RegisterForEvents from "./RegisterForEvents";
 
 export interface IListViewProps {
   context: WebPartContext;
@@ -46,6 +47,9 @@ interface IListViewState {
   events: IEventItem[];
   isLoading: boolean;
   error?: string;
+  registerPanelOpen: boolean;
+  selectedEventId?: number;
+  selectedEventTitle?: string;
 }
 
 export default class ListView extends React.Component<IListViewProps, IListViewState> {
@@ -53,7 +57,8 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
     super(props);
     this.state = {
       events: [],
-      isLoading: false
+      isLoading: false,
+      registerPanelOpen: false,
     };
   }
 
@@ -136,6 +141,24 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
     return filtered;
   };
 
+  private openRegisterPanel = (eventId: number, eventTitle: string): void => {
+    this.setState({
+      registerPanelOpen: true,
+      selectedEventId: eventId,
+      selectedEventTitle: eventTitle,
+    });
+  };
+
+  private closeRegisterPanel = (): void => {
+    this.setState({
+      registerPanelOpen: false,
+      selectedEventId: undefined,
+      selectedEventTitle: undefined,
+    });
+    // Reload events to reflect any changes
+    this.loadEvents().catch(console.error);
+  };
+
   private getColumns = (): IColumn[] => {
     return [
       {
@@ -214,7 +237,7 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
           return (
             <PrimaryButton
               text="Tilmeld"
-              // onClick={} // Add onClick handler here
+              onClick={() => this.openRegisterPanel(item.Id, item.Title)}
             />
           );
         }
@@ -223,7 +246,7 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
   };
 
   public render(): React.ReactElement<IListViewProps> {
-    const { events, isLoading, error } = this.state;
+    const { events, isLoading, error, registerPanelOpen, selectedEventId, selectedEventTitle } = this.state;
 
     if (isLoading) {
       return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
@@ -238,13 +261,25 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
     }
 
     return (
-      <DetailsList
-        items={events}
-        columns={this.getColumns()}
-        selectionMode={SelectionMode.none}
-        layoutMode={DetailsListLayoutMode.justified}
-        isHeaderVisible={true}
-      />
+      <>
+        <DetailsList
+          items={events}
+          columns={this.getColumns()}
+          selectionMode={SelectionMode.none}
+          layoutMode={DetailsListLayoutMode.justified}
+          isHeaderVisible={true}
+        />
+
+        {registerPanelOpen && selectedEventId && selectedEventTitle && (
+          <RegisterForEvents
+            context={this.props.context}
+            eventId={selectedEventId}
+            eventTitle={selectedEventTitle}
+            isOpen={registerPanelOpen}
+            onDismiss={this.closeRegisterPanel}
+          />
+        )}
+      </>
     );
   }
 }
