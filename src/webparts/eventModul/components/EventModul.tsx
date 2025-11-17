@@ -75,8 +75,16 @@ export default class EventModul extends React.Component<
       console.log("Loaded items from SharePoint:", items);
 
       const locations = items
-        .map((item: ILocationItem) => item.Placering)
-        .filter((location: string) => location); // Filter out null/empty in JavaScript
+        .map((item: ILocationItem) => {
+          if (!item.Placering) return null;
+          try {
+            const parsed = JSON.parse(item.Placering);
+            return parsed.DisplayName || item.Placering;
+          } catch {
+            return item.Placering;
+          }
+        })
+        .filter((location) => location);
       const uniqueLocations: string[] = [];
       const seen: { [key: string]: boolean } = {};
       for (const location of locations) {
@@ -218,7 +226,12 @@ export default class EventModul extends React.Component<
         )}
 
         <h2>Fremtidige events:</h2>
-        <ListView context={this.props.context} />
+        <ListView
+          context={this.props.context}
+          startDate={this.state.startDate}
+          endDate={this.state.endDate}
+          selectedLocation={this.state.selectedLocation}
+        />
       </section>
     );
   }

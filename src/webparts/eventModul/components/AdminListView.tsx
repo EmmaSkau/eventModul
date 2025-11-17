@@ -141,9 +141,18 @@ export default class AdminListView extends React.Component<
 
     // Filter by location
     if (this.props.selectedLocation && this.props.selectedLocation !== "all") {
-      filtered = filtered.filter(
-        (item) => item.Placering === this.props.selectedLocation
-      );
+      filtered = filtered.filter((item) => {
+        if (!item.Placering) return false;
+
+        // Parse JSON to get DisplayName
+        try {
+          const parsed = JSON.parse(item.Placering);
+          return parsed.DisplayName === this.props.selectedLocation;
+        } catch {
+          // If not JSON, compare directly
+          return item.Placering === this.props.selectedLocation;
+        }
+      });
     }
 
     return filtered;
@@ -236,6 +245,15 @@ export default class AdminListView extends React.Component<
         minWidth: 100,
         maxWidth: 150,
         isResizable: true,
+        onRender: (item: IEventItem) => {
+          if (!item.Placering) return "-";
+          try {
+            const parsed = JSON.parse(item.Placering);
+            return parsed.DisplayName || item.Placering;
+          } catch {
+            return item.Placering;
+          }
+        },
       },
       {
         key: "targetGroup",
@@ -310,7 +328,7 @@ export default class AdminListView extends React.Component<
           isHeaderVisible={true}
         />
 
-        <CreateEvent 
+        <CreateEvent
           isOpen={this.state.editPanelOpen}
           onClose={this.handleCloseEditPanel}
           context={this.props.context}
