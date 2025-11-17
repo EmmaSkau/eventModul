@@ -14,9 +14,8 @@ import {
   SpinnerSize,
   MessageBar,
   MessageBarType,
-  PrimaryButton,
+  DefaultButton,
 } from "@fluentui/react";
-import RegisterForEvents from "./RegisterForEvents";
 
 export interface IListViewProps {
   context: WebPartContext;
@@ -47,13 +46,13 @@ interface IListViewState {
   events: IEventItem[];
   isLoading: boolean;
   error?: string;
-  registerPanelOpen: boolean;
   selectedEventId?: number;
   selectedEventTitle?: string;
-  registeredEventIds: number[];
+  editPanelOpen: boolean;
+  selectedEventForEdit?: IEventItem;
 }
 
-export default class ListView extends React.Component<
+export default class RegisteredListView extends React.Component<
   IListViewProps,
   IListViewState
 > {
@@ -62,14 +61,12 @@ export default class ListView extends React.Component<
     this.state = {
       events: [],
       isLoading: false,
-      registerPanelOpen: false,
-      registeredEventIds: [],
+      editPanelOpen: false,
     };
   }
 
   public componentDidMount(): void {
     this.loadEvents().catch(console.error);
-    this.loadUserRegistrations().catch(console.error); // Add this
   }
 
   public componentDidUpdate(prevProps: IListViewProps): void {
@@ -87,8 +84,34 @@ export default class ListView extends React.Component<
     try {
       this.setState({ isLoading: true, error: undefined });
       const sp = getSP(this.props.context);
+      const currentUser = await sp.web.currentUser();
 
-      // Get ALL items by explicitly requesting a large number
+      // Step 1: Get all EventIds where the current user is registered
+      const registrations = await sp.web.lists
+        .getByTitle("EventRegistrations")
+        .items.filter(`Title eq '${currentUser.Title}'`)
+        .select("EventId")();
+
+      // Extract the event IDs
+      const registeredEventIds = registrations
+        .map((reg) => reg.EventId)
+        .filter((id) => id);
+
+      if (registeredEventIds.length === 0) {
+        // User has no registrations
+        this.setState({
+          events: [],
+          isLoading: false,
+        });
+        return;
+      }
+
+      // Step 2: Get the events that match the registered event IDs
+      // Build filter for multiple IDs: (Id eq 1) or (Id eq 2) or (Id eq 3)
+      const idFilters = registeredEventIds
+        .map((id) => `Id eq ${id}`)
+        .join(" or ");
+
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
         .items.select(
@@ -101,9 +124,10 @@ export default class ListView extends React.Component<
           "Capacity"
         )
         .expand("Administrator")
-        .top(1000)(); // Request up to 1000 items
+        .filter(idFilters)
+        .top(1000)();
 
-      // Filter items based on props
+      // Apply additional filters from props (date range, location, etc.)
       const filteredItems = this.filterEvents(items);
 
       this.setState({
@@ -111,10 +135,10 @@ export default class ListView extends React.Component<
         isLoading: false,
       });
     } catch (error) {
-      console.error("Error loading events:", error);
+      console.error("Error loading registered events:", error);
       this.setState({
         isLoading: false,
-        error: "Kunne ikke indlæse events fra SharePoint",
+        error: "Kunne ikke indlæse dine tilmeldte events",
       });
     }
   };
@@ -159,89 +183,39 @@ export default class ListView extends React.Component<
     return filtered;
   };
 
-  private closeRegisterPanel = (): void => {
-    this.setState({
-      registerPanelOpen: false,
-      selectedEventId: undefined,
-      selectedEventTitle: undefined,
-    });
-    this.loadEvents().catch(console.error);
-  };
-
-  // HANDLE REGISTRATIONS
-  private checkIfEventHasCustomFields = async (
-    eventId: number
-  ): Promise<boolean> => {
-    try {
-      const sp = getSP(this.props.context);
-      const fields = await sp.web.lists
-        .getByTitle("EventFields")
-        .items.filter(`EventId eq ${eventId}`)
-        .select("Id")();
-
-      return fields.length > 0;
-    } catch (error) {
-      console.error("Error checking custom fields:", error);
-      return false;
+  private handleDeleteEvent = async (item: IEventItem): Promise<void> => {
+    if (
+      !confirm(`Er du sikker på, at du vil afmeldes "${item.Title}" event?`)
+    ) {
+      return;
     }
-  };
 
-  private registerUserToEvent = async (eventId: number): Promise<void> => {
     try {
       const sp = getSP(this.props.context);
       const currentUser = await sp.web.currentUser();
-
-      await sp.web.lists.getByTitle("EventRegistrations").items.add({
-        Title: currentUser.Title,
-        EventId: eventId,
-      });
-
-      alert("Du er nu tilmeldt eventet!");
-
-      await this.loadUserRegistrations(); 
-      await this.loadEvents();
-    } catch (error) {
-      console.error("Error registering for event:", error);
-      alert("Fejl ved tilmelding. Prøv igen.");
-    }
-  };
-
-  private handleRegister = async (
-    eventId: number,
-    eventTitle: string
-  ): Promise<void> => {
-    const hasCustomFields = await this.checkIfEventHasCustomFields(eventId);
-
-    if (hasCustomFields) {
-      this.setState({
-        registerPanelOpen: true,
-        selectedEventId: eventId,
-        selectedEventTitle: eventTitle,
-      });
-    } else {
-      if (confirm(`Vil du tilmelde dig til "${eventTitle}"?`)) {
-        await this.registerUserToEvent(eventId);
-      }
-    }
-  };
-
-  private loadUserRegistrations = async (): Promise<void> => {
-    try {
-      const sp = getSP(this.props.context);
-      const currentUser = await sp.web.currentUser();
-
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`Title eq '${currentUser.Title}'`)
-        .select("EventId")();
+        .items.filter(
+          `Title eq '${currentUser.Title}' and EventId eq ${item.Id}`
+        )
+        .select("Id")();
 
-      const registeredEventIds = registrations
-        .map((reg) => reg.EventId)
-        .filter((id) => id);
+      if (registrations.length === 0) {
+        alert("Kunne ikke finde din tilmelding.");
+        return;
+      }
 
-      this.setState({ registeredEventIds });
+      await sp.web.lists
+        .getByTitle("EventRegistrations")
+        .items.getById(registrations[0].Id)
+        .delete();
+
+      alert("Du er nu afmeldt eventet!");
+
+      await this.loadEvents();
     } catch (error) {
-      console.error("Error loading user registrations:", error);
+      console.error("Error unregistering from event:", error);
+      alert("Fejl ved afmelding af event. Prøv igen.");
     }
   };
 
@@ -308,36 +282,17 @@ export default class ListView extends React.Component<
         },
       },
       {
-        key: "targetGroup",
-        name: "Målgruppe",
-        fieldName: "targetGroup",
-        minWidth: 100,
-        maxWidth: 150,
-        isResizable: true,
-      },
-      {
-        key: "Capacity",
-        name: "Kapacitet",
-        fieldName: "Capacity",
-        minWidth: 80,
-        maxWidth: 100,
-        isResizable: true,
-      },
-      {
-        key: "Tilmeld",
-        name: "Tilmeld",
-        fieldName: "Tilmeld",
-        minWidth: 100,
-        maxWidth: 150,
+        key: "actions",
+        name: "Afmeld",
+        fieldName: "actions",
+        minWidth: 200,
+        maxWidth: 250,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          const isRegistered = this.state.registeredEventIds.indexOf(item.Id) !== -1;
-
           return (
-            <PrimaryButton
-              text={isRegistered ? "Tilmeldt" : "Tilmeld"}
-              onClick={() => this.handleRegister(item.Id, item.Title)}
-              disabled={isRegistered}
+            <DefaultButton
+              text="Afmeld event"
+              onClick={() => this.handleDeleteEvent(item)}
             />
           );
         },
@@ -346,14 +301,7 @@ export default class ListView extends React.Component<
   };
 
   public render(): React.ReactElement<IListViewProps> {
-    const {
-      events,
-      isLoading,
-      error,
-      registerPanelOpen,
-      selectedEventId,
-      selectedEventTitle,
-    } = this.state;
+    const { events, isLoading, error } = this.state;
 
     if (isLoading) {
       return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
@@ -382,16 +330,6 @@ export default class ListView extends React.Component<
           layoutMode={DetailsListLayoutMode.justified}
           isHeaderVisible={true}
         />
-
-        {registerPanelOpen && selectedEventId && selectedEventTitle && (
-          <RegisterForEvents
-            context={this.props.context}
-            eventId={selectedEventId}
-            eventTitle={selectedEventTitle}
-            isOpen={registerPanelOpen}
-            onDismiss={this.closeRegisterPanel}
-          />
-        )}
       </>
     );
   }

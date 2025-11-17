@@ -17,6 +17,7 @@ import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
 import ListView from "./ListView";
+import RegisteredListView from "./RegisteredListView";
 import AdminPage from "./adminPage";
 
 interface ILocationItem {
@@ -167,6 +168,10 @@ export default class EventModul extends React.Component<
           hasTeamsContext ? styles.teams : ""
         }`}
       >
+        {this.state.showAdminPage && (
+          <AdminPage {...this.props} onClose={this.handleCloseAdminPage} />
+        )}
+
         <div className={styles.welcome}>
           <h2>{escape(userDisplayName)}s Events</h2>
           <p>Her kan du se alle dine events og fremtidige events</p>
@@ -206,7 +211,11 @@ export default class EventModul extends React.Component<
           />
         </section>
         <section className={styles.filterToggle}>
-          <Toggle label="Tilmeldt" checked={this.state.registered} />
+          <Toggle
+            label="Tilmeldt"
+            checked={this.state.registered}
+            onChange={(_, checked) => this.setState({ registered: !!checked })}
+          />
 
           <Toggle label="Afmeldt" checked={this.state.cancelledEvents} />
 
@@ -218,17 +227,23 @@ export default class EventModul extends React.Component<
             onClick={this.resetFilters}
           />
         </section>
-        {this.state.showAdminPage && (
-          <AdminPage {...this.props} onClose={this.handleCloseAdminPage} />
-        )}
 
-        <h2>Fremtidige events:</h2>
-        <ListView
-          context={this.props.context}
-          startDate={this.state.startDate}
-          endDate={this.state.endDate}
-          selectedLocation={this.state.selectedLocation}
-        />
+        <h2>{this.state.registered ? "Mine events:" : "Fremtidige events:"}</h2>
+        {this.state.registered ? (
+          <RegisteredListView
+            context={this.props.context}
+            startDate={this.state.startDate}
+            endDate={this.state.endDate}
+            selectedLocation={this.state.selectedLocation}
+          />
+        ) : (
+          <ListView
+            context={this.props.context}
+            startDate={this.state.startDate}
+            endDate={this.state.endDate}
+            selectedLocation={this.state.selectedLocation}
+          />
+        )}
       </section>
     );
   }
