@@ -4,7 +4,7 @@ import type { IEventModulProps } from "./IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
 import { PrimaryButton, ActionButton, IIconProps } from "@fluentui/react";
 import CreateEvent from "./CreateEvent";
-import ListView from "./ListView";
+import AdminListView from "./AdminListView";
 
 interface IAdminPageProps extends IEventModulProps {
   onClose?: () => void;
@@ -15,7 +15,7 @@ interface IEventModulState {
 }
 
 export default class AdminPage extends React.Component<IAdminPageProps, IEventModulState> {
-  private listViewRef = React.createRef<ListView>();
+  private listViewRef = React.createRef<AdminListView>();
 
   constructor(props: IAdminPageProps) {
     super(props);
@@ -80,13 +80,12 @@ export default class AdminPage extends React.Component<IAdminPageProps, IEventMo
           onClick={this.handleCreateEvent}
         />
 
-        {this.state.showCreateEvent && (
-          <CreateEvent 
-            onClose={this.handleCloseCreateEvent}
-            context={this.props.context}
-            onEventCreated={this.handleEventCreated}
-          />
-        )}
+        <CreateEvent 
+          isOpen={this.state.showCreateEvent}
+          onClose={this.handleCloseCreateEvent}
+          context={this.props.context}
+          onEventCreated={this.handleEventCreated}
+        />
 
         <div>
           <ActionButton
@@ -106,7 +105,7 @@ export default class AdminPage extends React.Component<IAdminPageProps, IEventMo
             Dette år
           </ActionButton>
         </div>
-        <ListView ref={this.listViewRef} context={this.props.context} />
+        <AdminListView ref={this.listViewRef} context={this.props.context} />
       </section>
     );
   }

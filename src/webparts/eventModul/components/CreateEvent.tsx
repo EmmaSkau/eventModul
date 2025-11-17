@@ -11,14 +11,31 @@ import {
   TextField,
   Dropdown,
   IDropdownOption,
+  Panel,
+  PanelType,
+  DefaultButton,
+  Stack,
 } from "@fluentui/react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
-import styles from "./EventModul.module.scss";
+
+interface IEventItem {
+  Id: number;
+  Title: string;
+  Dato?: string;
+  SlutDato?: string;
+  Administrator?: {
+    Title: string;
+  };
+  Placering?: string;
+  Capacity?: number;
+}
 
 interface ICreateEventProps {
   onClose?: () => void;
   context: WebPartContext;
   onEventCreated?: () => void;
+  eventToEdit?: IEventItem;
+  isOpen: boolean;
 }
 
 interface ICreateEventState {
@@ -42,13 +59,23 @@ export default class CreateEvent extends React.Component<
 > {
   constructor(props: ICreateEventProps) {
     super(props);
+    const eventToEdit = props.eventToEdit;
+    const isEditing = !!eventToEdit;
+
     this.state = {
       // Form fields
-      title: "",
-      startDate: undefined,
-      endDate: undefined,
-      selectedLocation: undefined,
-      maxParticipants: undefined,
+      title: isEditing ? eventToEdit!.Title : "",
+      startDate:
+        isEditing && eventToEdit!.Dato
+          ? new Date(eventToEdit!.Dato)
+          : undefined,
+      endDate:
+        isEditing && eventToEdit!.SlutDato
+          ? new Date(eventToEdit!.SlutDato)
+          : undefined,
+      selectedLocation: isEditing ? eventToEdit!.Placering : undefined,
+      maxParticipants:
+        isEditing && eventToEdit!.Capacity ? eventToEdit!.Capacity : undefined,
 
       // Loading states
       isLoadingEmployees: false,
@@ -64,7 +91,33 @@ export default class CreateEvent extends React.Component<
     });
   }
 
-  
+  public componentDidUpdate(prevProps: ICreateEventProps): void {
+    if (
+      this.props.eventToEdit &&
+      this.props.eventToEdit !== prevProps.eventToEdit
+    ) {
+      const eventToEdit = this.props.eventToEdit;
+      this.setState({
+        title: eventToEdit.Title,
+        startDate: eventToEdit.Dato ? new Date(eventToEdit.Dato) : undefined,
+        endDate: eventToEdit.SlutDato
+          ? new Date(eventToEdit.SlutDato)
+          : undefined,
+        selectedLocation: eventToEdit.Placering,
+        maxParticipants: eventToEdit.Capacity,
+      });
+    }
+    // When switching from edit to create mode, clear the form
+    else if (!this.props.eventToEdit && prevProps.eventToEdit) {
+      this.setState({
+        title: "",
+        startDate: undefined,
+        endDate: undefined,
+        selectedLocation: undefined,
+        maxParticipants: undefined,
+      });
+    }
+  }
 
   // LOCATIONS START
   private loadLocationsFromSharePoint = async (): Promise<void> => {
@@ -138,13 +191,8 @@ export default class CreateEvent extends React.Component<
     try {
       this.setState({ isSaving: true });
 
-      const {
-        title,
-        startDate,
-        endDate,
-        selectedLocation,
-        maxParticipants,
-      } = this.state;
+      const { title, startDate, endDate, selectedLocation, maxParticipants } =
+        this.state;
 
       // Validation
       if (!title || !startDate || !endDate) {
@@ -161,28 +209,46 @@ export default class CreateEvent extends React.Component<
       const currentUser = await sp.web.currentUser();
 
       // Prepare the item data with CORRECT column names
-      const itemData: any = {
+      const itemData: {
+        Title: string;
+        Dato: string;
+        SlutDato: string;
+        AdministratorId: number;
+        Placering: string;
+        Capacity: number | null;
+      } = {
         Title: title,
         Dato: startDate.toISOString(),
         SlutDato: endDate.toISOString(),
         AdministratorId: currentUser.Id, // Person field needs user ID (integer)
         Placering: selectedLocation || "",
-        Capacity: maxParticipants ? parseInt(String(maxParticipants), 10) : null,
+        Capacity: maxParticipants
+          ? parseInt(String(maxParticipants), 10)
+          : null,
       };
 
-      // Create the item
-      const result = await sp.web.lists.getByTitle("EventDB").items.add(itemData);
+      // Check if we're editing or creating
+      if (this.props.eventToEdit) {
+        // UPDATE existing item
+        await sp.web.lists
+          .getByTitle("EventDB")
+          .items.getById(this.props.eventToEdit.Id)
+          .update(itemData);
+        alert("Event opdateret!");
+      } else {
+        // CREATE new item
+        await sp.web.lists
+          .getByTitle("EventDB")
+          .items.add(itemData);
+        alert("Event oprettet!");
+      }
 
-      console.log("Event created successfully:", result);
-      
-      // Notify parent that event was created so ListView can refresh
+      // Notify parent that event was created/updated so ListView can refresh
       if (this.props.onEventCreated) {
         this.props.onEventCreated();
       }
 
       this.setState({ isSaving: false });
-      
-      alert("Event created successfully!");
 
       // Close the form
       if (this.props.onClose) {
@@ -190,72 +256,90 @@ export default class CreateEvent extends React.Component<
       }
     } catch (error) {
       console.error("Error saving event:", error);
-      alert("Error creating event. Please try again.");
+      alert(
+        this.props.eventToEdit
+          ? "Fejl ved opdatering af event. Prøv igen."
+          : "Fejl ved oprettelse af event. Prøv igen."
+      );
       this.setState({ isSaving: false });
     }
   };
 
   public render(): React.ReactElement {
+    const { isOpen, onClose, eventToEdit } = this.props;
+
     return (
-      <section>
-        <h1>Opret ny event</h1>
+      <Panel
+        isOpen={isOpen}
+        onDismiss={onClose}
+        type={PanelType.medium}
+        headerText={eventToEdit ? "Ret event" : "Opret ny event"}
+        closeButtonAriaLabel="Luk"
+      >
+        <Stack tokens={{ childrenGap: 15 }}>
+            <DatePicker
+              label="Fra"
+              firstDayOfWeek={DayOfWeek.Monday}
+              showWeekNumbers={true}
+              placeholder="Vælg start dato"
+              ariaLabel="Vælg start dato"
+              value={this.state.startDate}
+              onSelectDate={this.onStartDateChange}
+            />
+            <DatePicker
+              label="Til"
+              firstDayOfWeek={DayOfWeek.Monday}
+              showWeekNumbers={true}
+              placeholder="Vælg slut dato"
+              ariaLabel="Vælg slut dato"
+              value={this.state.endDate}
+              onSelectDate={this.onEndDateChange}
+            />
 
-        <div className={styles.filters}>
-          <DatePicker
-            label="Fra"
-            firstDayOfWeek={DayOfWeek.Monday}
-            showWeekNumbers={true}
-            placeholder="Select start date"
-            ariaLabel="Select start date"
-            value={this.state.startDate}
-            onSelectDate={this.onStartDateChange}
+          <TextField
+            label="Title"
+            value={this.state.title}
+            onChange={this.onTitleChange}
+            required
           />
-          <DatePicker
-            label="Til"
-            firstDayOfWeek={DayOfWeek.Monday}
-            showWeekNumbers={true}
-            placeholder="Select end date"
-            ariaLabel="Select end date"
-            value={this.state.endDate}
-            onSelectDate={this.onEndDateChange}
+
+          <Dropdown
+            label="Placering"
+            placeholder={
+              this.state.isLoadingLocations
+                ? "Indlæser lokationer..."
+                : "Vælg lokation..."
+            }
+            options={this.state.locationOptions}
+            selectedKey={this.state.selectedLocation}
+            onChange={this.onLocationChange}
+            disabled={this.state.isLoadingLocations}
           />
-        </div>
 
-        <TextField
-          label="Title"
-          value={this.state.title}
-          onChange={this.onTitleChange}
-          required
-        />
+          <TextField
+            label="Kapacitet"
+            type="number"
+            value={this.state.maxParticipants?.toString() || ""}
+            onChange={(e, newValue) => {
+              const numValue = newValue ? parseInt(newValue, 10) : undefined;
+              this.setState({ maxParticipants: numValue });
+            }}
+          />
 
-        <Dropdown
-          label="Placering"
-          placeholder={
-            this.state.isLoadingLocations
-              ? "Indlæser lokationer..."
-              : "Vælg lokation..."
-          }
-          options={this.state.locationOptions}
-          selectedKey={this.state.selectedLocation}
-          onChange={this.onLocationChange}
-          disabled={this.state.isLoadingLocations}
-        />
-
-        <TextField
-          label="Kapacitet"
-          type="number"
-          onChange={(e, newValue) => {
-            const numValue = newValue ? parseInt(newValue, 10) : undefined;
-            this.setState({ maxParticipants: numValue });
-          }}
-        />
-
-        <PrimaryButton
-          text="Afslut og gem event"
-          onClick={this.saveEvent}
-          disabled={this.state.isSaving}
-        />
-      </section>
+          <Stack horizontal tokens={{ childrenGap: 10 }}>
+            <PrimaryButton
+              text={eventToEdit ? "Gem ændringer" : "Gem event"}
+              onClick={this.saveEvent}
+              disabled={this.state.isSaving}
+            />
+            <DefaultButton
+              text="Annuller"
+              onClick={onClose}
+              disabled={this.state.isSaving}
+            />
+          </Stack>
+        </Stack>
+      </Panel>
     );
   }
 }

@@ -82,6 +82,7 @@ export default class RegisterForEvents extends React.Component<
         .getByTitle("EventFields")
         .fields.select("Title", "InternalName", "TypeAsString")();
       console.log("EventFields available fields:", allFields);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).eventFieldsTemp = allFields;
       console.log("Search fields with: eventFieldsTemp.filter(f => f.Title?.includes('Event'))");
 
@@ -209,7 +210,7 @@ export default class RegisterForEvents extends React.Component<
         );
 
       case "Dropdown":
-      case "Valgmenu":
+      case "Valgmenu": {
         const options: IDropdownOption[] = field.Valgmuligheder
           ? field.Valgmuligheder.split(",").map((opt) => ({
               key: opt.trim(),
@@ -227,6 +228,7 @@ export default class RegisterForEvents extends React.Component<
             }
           />
         );
+      }
 
       case "Checkbox":
       case "Afkrydsningsfelt":
