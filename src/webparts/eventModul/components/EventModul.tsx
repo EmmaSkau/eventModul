@@ -9,6 +9,7 @@ import {
   IDropdownOption,
   Toggle,
   DefaultButton,
+  PrimaryButton,
 } from "@fluentui/react";
 import { formatDate } from "./Utility/formatDate";
 import { getSP } from "../../../pnpConfig";
@@ -16,6 +17,7 @@ import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
 import ListView from "./ListView";
+import AdminPage from "./adminPage";
 
 interface ILocationItem {
   Placering: string;
@@ -31,6 +33,7 @@ interface IEventModulState {
   registered?: boolean;
   cancelledEvents?: boolean;
   waitlisted?: boolean;
+  showAdminPage: boolean;
 }
 
 export default class EventModul extends React.Component<
@@ -49,6 +52,7 @@ export default class EventModul extends React.Component<
       registered: false,
       cancelledEvents: false,
       waitlisted: false,
+      showAdminPage: false,
     };
   }
 
@@ -131,6 +135,14 @@ export default class EventModul extends React.Component<
     });
   };
 
+  private handleOpenAdminPage = (): void => {
+    this.setState({ showAdminPage: true });
+  };
+
+  private handleCloseAdminPage = (): void => {
+    this.setState({ showAdminPage: false });
+  };
+
   public render(): React.ReactElement<IEventModulProps> {
     const { hasTeamsContext, userDisplayName } = this.props;
     const {
@@ -150,6 +162,10 @@ export default class EventModul extends React.Component<
         <div className={styles.welcome}>
           <h2>{escape(userDisplayName)}s Events</h2>
           <p>Her kan du se alle dine events og fremtidige events</p>
+          <PrimaryButton
+            text="Admin page"
+            onClick={this.handleOpenAdminPage}
+          />
         </div>
 
         <section className={styles.filters}>
@@ -197,6 +213,9 @@ export default class EventModul extends React.Component<
             onClick={this.resetFilters}
           />
         </section>
+        {this.state.showAdminPage && (
+          <AdminPage {...this.props} onClose={this.handleCloseAdminPage} />
+        )}
 
         <h2>Fremtidige events:</h2>
         <ListView context={this.props.context} />

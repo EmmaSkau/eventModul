@@ -4,16 +4,23 @@ import type { IEventModulProps } from "./IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
 import { PrimaryButton, ActionButton, IIconProps } from "@fluentui/react";
 import CreateEvent from "./CreateEvent";
+import ListView from "./ListView";
+
+interface IAdminPageProps extends IEventModulProps {
+  onClose?: () => void;
+}
 
 interface IEventModulState {
   showCreateEvent: boolean;
 }
 
-export default class EventModul extends React.Component<IEventModulProps, IEventModulState> {
-  constructor(props: IEventModulProps) {
+export default class AdminPage extends React.Component<IAdminPageProps, IEventModulState> {
+  private listViewRef = React.createRef<ListView>();
+
+  constructor(props: IAdminPageProps) {
     super(props);
     this.state = {
-      showCreateEvent: false
+      showCreateEvent: false,
     };
   }
 
@@ -24,8 +31,30 @@ export default class EventModul extends React.Component<IEventModulProps, IEvent
   private handleCloseCreateEvent = (): void => {
     this.setState({ showCreateEvent: false });
   };
+
+  private handleEventCreated = (): void => {
+    // Refresh the ListView when a new event is created
+    if (this.listViewRef.current) {
+      // Try multiple refreshes with increasing delays to catch the new item once SharePoint indexes it
+      const refreshTimes = [2000, 4000, 6000]; // Refresh at 2s, 4s, and 6s
+      
+      refreshTimes.forEach((delay) => {
+        setTimeout(() => {
+          if (this.listViewRef.current) {
+            this.listViewRef.current.loadEvents().catch(console.error);
+          }
+        }, delay);
+      });
+    }
+  };
+
+  private handleCloseAdminPage = (): void => {
+    if (this.props.onClose) {
+      this.props.onClose();
+    }
+  };
   
-  public render(): React.ReactElement<IEventModulProps> {
+  public render(): React.ReactElement<IAdminPageProps> {
     const { hasTeamsContext, userDisplayName } = this.props;
 
     const monthIcon: IIconProps = { iconName: "Calendar" };
@@ -40,6 +69,10 @@ export default class EventModul extends React.Component<IEventModulProps, IEvent
         <div className={styles.welcome}>
           <h2>{escape(userDisplayName)}s Events</h2>
           <p>Her kan du se alle dine events og oprette ny events</p>
+          <PrimaryButton
+            text="Luk Admin page"
+            onClick={this.handleCloseAdminPage}
+          />
         </div>
 
         <PrimaryButton 
@@ -48,7 +81,11 @@ export default class EventModul extends React.Component<IEventModulProps, IEvent
         />
 
         {this.state.showCreateEvent && (
-          <CreateEvent onClose={this.handleCloseCreateEvent} />
+          <CreateEvent 
+            onClose={this.handleCloseCreateEvent}
+            context={this.props.context}
+            onEventCreated={this.handleEventCreated}
+          />
         )}
 
         <div>
@@ -69,6 +106,7 @@ export default class EventModul extends React.Component<IEventModulProps, IEvent
             Dette år
           </ActionButton>
         </div>
+        <ListView ref={this.listViewRef} context={this.props.context} />
       </section>
     );
   }

@@ -37,7 +37,7 @@ interface IEventItem {
     Title: string;
   };
   Placering?: string;
-  Aldersgruppe?: string;
+  targetGroup?: string;
   Beskrivelse?: string;
   TilfoejEkstraInfo?: string;
   Capacity?: number;
@@ -75,12 +75,12 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
     }
   }
 
-  private loadEvents = async (): Promise<void> => {
+  public loadEvents = async (): Promise<void> => {
     try {
       this.setState({ isLoading: true, error: undefined });
       const sp = getSP(this.props.context);
 
-      // Get items with just basic fields to test
+      // Get ALL items by explicitly requesting a large number
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
         .items.select(
@@ -92,7 +92,8 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
           "Placering",
           "Capacity"
         )
-        .expand("Administrator")();
+        .expand("Administrator")
+        .top(1000)(); // Request up to 1000 items
 
       // Filter items based on props
       const filteredItems = this.filterEvents(items);
@@ -211,9 +212,9 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
         isResizable: true,
       },
       {
-        key: "Aldersgruppe",
-        name: "Aldersgruppe",
-        fieldName: "Aldersgruppe",
+        key: "targetGroup",
+        name: "Målgruppe",
+        fieldName: "targetGroup",
         minWidth: 100,
         maxWidth: 150,
         isResizable: true,
