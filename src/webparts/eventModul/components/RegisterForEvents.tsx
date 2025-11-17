@@ -84,7 +84,9 @@ export default class RegisterForEvents extends React.Component<
       console.log("EventFields available fields:", allFields);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).eventFieldsTemp = allFields;
-      console.log("Search fields with: eventFieldsTemp.filter(f => f.Title?.includes('Event'))");
+      console.log(
+        "Search fields with: eventFieldsTemp.filter(f => f.Title?.includes('Event'))"
+      );
 
       const fields: IEventField[] = await sp.web.lists
         .getByTitle("EventFields")
@@ -205,7 +207,9 @@ export default class RegisterForEvents extends React.Component<
             label={field.Title}
             required={field.P_x00e5_kr_x00e6_vet}
             value={value as string}
-            onChange={(_, newValue) => this.onFieldChange(field.Id, newValue || "")}
+            onChange={(_, newValue) =>
+              this.onFieldChange(field.Id, newValue || "")
+            }
           />
         );
 
@@ -224,7 +228,7 @@ export default class RegisterForEvents extends React.Component<
             options={options}
             selectedKey={value as string}
             onChange={(_, option) =>
-              this.onFieldChange(field.Id, option?.key as string || "")
+              this.onFieldChange(field.Id, (option?.key as string) || "")
             }
           />
         );
@@ -246,7 +250,9 @@ export default class RegisterForEvents extends React.Component<
             label={field.Title}
             required={field.P_x00e5_kr_x00e6_vet}
             value={value as string}
-            onChange={(_, newValue) => this.onFieldChange(field.Id, newValue || "")}
+            onChange={(_, newValue) =>
+              this.onFieldChange(field.Id, newValue || "")
+            }
           />
         );
     }
@@ -269,7 +275,9 @@ export default class RegisterForEvents extends React.Component<
         ) : (
           <Stack tokens={{ childrenGap: 15 }}>
             {error && (
-              <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
+              <MessageBar messageBarType={MessageBarType.error}>
+                {error}
+              </MessageBar>
             )}
             {success && (
               <MessageBar messageBarType={MessageBarType.success}>
@@ -293,7 +301,11 @@ export default class RegisterForEvents extends React.Component<
                 onClick={this.handleSubmit}
                 disabled={isSaving}
               />
-              <DefaultButton text="Annuller" onClick={onDismiss} disabled={isSaving} />
+              <DefaultButton
+                text="Annuller"
+                onClick={onDismiss}
+                disabled={isSaving}
+              />
             </Stack>
           </Stack>
         )}

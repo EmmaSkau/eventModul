@@ -170,10 +170,7 @@ export default class EventModul extends React.Component<
         <div className={styles.welcome}>
           <h2>{escape(userDisplayName)}s Events</h2>
           <p>Her kan du se alle dine events og fremtidige events</p>
-          <PrimaryButton
-            text="Admin page"
-            onClick={this.handleOpenAdminPage}
-          />
+          <PrimaryButton text="Admin page" onClick={this.handleOpenAdminPage} />
         </div>
 
         <section className={styles.filters}>

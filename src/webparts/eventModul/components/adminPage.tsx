@@ -14,7 +14,10 @@ interface IEventModulState {
   showCreateEvent: boolean;
 }
 
-export default class AdminPage extends React.Component<IAdminPageProps, IEventModulState> {
+export default class AdminPage extends React.Component<
+  IAdminPageProps,
+  IEventModulState
+> {
   private listViewRef = React.createRef<AdminListView>();
 
   constructor(props: IAdminPageProps) {
@@ -37,7 +40,7 @@ export default class AdminPage extends React.Component<IAdminPageProps, IEventMo
     if (this.listViewRef.current) {
       // Try multiple refreshes with increasing delays to catch the new item once SharePoint indexes it
       const refreshTimes = [2000, 4000, 6000]; // Refresh at 2s, 4s, and 6s
-      
+
       refreshTimes.forEach((delay) => {
         setTimeout(() => {
           if (this.listViewRef.current) {
@@ -53,7 +56,7 @@ export default class AdminPage extends React.Component<IAdminPageProps, IEventMo
       this.props.onClose();
     }
   };
-  
+
   public render(): React.ReactElement<IAdminPageProps> {
     const { hasTeamsContext, userDisplayName } = this.props;
 
@@ -75,12 +78,9 @@ export default class AdminPage extends React.Component<IAdminPageProps, IEventMo
           />
         </div>
 
-        <PrimaryButton 
-          text="Opret ny event" 
-          onClick={this.handleCreateEvent}
-        />
+        <PrimaryButton text="Opret ny event" onClick={this.handleCreateEvent} />
 
-        <CreateEvent 
+        <CreateEvent
           isOpen={this.state.showCreateEvent}
           onClose={this.handleCloseCreateEvent}
           context={this.props.context}

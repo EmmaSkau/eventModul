@@ -52,7 +52,10 @@ interface IListViewState {
   selectedEventTitle?: string;
 }
 
-export default class ListView extends React.Component<IListViewProps, IListViewState> {
+export default class ListView extends React.Component<
+  IListViewProps,
+  IListViewState
+> {
   constructor(props: IListViewProps) {
     super(props);
     this.state = {
@@ -68,9 +71,11 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
 
   public componentDidUpdate(prevProps: IListViewProps): void {
     // Reload when filters change
-    if (prevProps.startDate !== this.props.startDate ||
-        prevProps.endDate !== this.props.endDate ||
-        prevProps.selectedLocation !== this.props.selectedLocation) {
+    if (
+      prevProps.startDate !== this.props.startDate ||
+      prevProps.endDate !== this.props.endDate ||
+      prevProps.selectedLocation !== this.props.selectedLocation
+    ) {
       this.loadEvents().catch(console.error);
     }
   }
@@ -116,7 +121,7 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
 
     // Filter by start date
     if (this.props.startDate) {
-      filtered = filtered.filter(item => {
+      filtered = filtered.filter((item) => {
         if (!item.Dato) return false;
         const eventDate = new Date(item.Dato);
         return eventDate >= this.props.startDate!;
@@ -125,7 +130,7 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
 
     // Filter by end date
     if (this.props.endDate) {
-      filtered = filtered.filter(item => {
+      filtered = filtered.filter((item) => {
         if (!item.Dato) return false;
         const eventDate = new Date(item.Dato);
         return eventDate <= this.props.endDate!;
@@ -198,7 +203,9 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          return item.SlutDato ? new Date(item.SlutDato).toLocaleDateString("DK") : "-";
+          return item.SlutDato
+            ? new Date(item.SlutDato).toLocaleDateString("DK")
+            : "-";
         },
       },
       {
@@ -259,24 +266,37 @@ export default class ListView extends React.Component<IListViewProps, IListViewS
               onClick={() => this.openRegisterPanel(item.Id, item.Title)}
             />
           );
-        }
-      }
+        },
+      },
     ];
   };
 
   public render(): React.ReactElement<IListViewProps> {
-    const { events, isLoading, error, registerPanelOpen, selectedEventId, selectedEventTitle } = this.state;
+    const {
+      events,
+      isLoading,
+      error,
+      registerPanelOpen,
+      selectedEventId,
+      selectedEventTitle,
+    } = this.state;
 
     if (isLoading) {
       return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
     }
 
     if (error) {
-      return <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>;
+      return (
+        <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
+      );
     }
 
     if (events.length === 0) {
-      return <MessageBar messageBarType={MessageBarType.info}>Ingen events fundet</MessageBar>;
+      return (
+        <MessageBar messageBarType={MessageBarType.info}>
+          Ingen events fundet
+        </MessageBar>
+      );
     }
 
     return (

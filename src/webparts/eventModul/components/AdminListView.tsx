@@ -297,8 +297,7 @@ export default class AdminListView extends React.Component<
   };
 
   public render(): React.ReactElement<IListViewProps> {
-    const { events, isLoading, error, } =
-      this.state;
+    const { events, isLoading, error } = this.state;
 
     if (isLoading) {
       return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;

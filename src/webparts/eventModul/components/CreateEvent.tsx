@@ -237,9 +237,7 @@ export default class CreateEvent extends React.Component<
         alert("Event opdateret!");
       } else {
         // CREATE new item
-        await sp.web.lists
-          .getByTitle("EventDB")
-          .items.add(itemData);
+        await sp.web.lists.getByTitle("EventDB").items.add(itemData);
         alert("Event oprettet!");
       }
 
@@ -277,24 +275,24 @@ export default class CreateEvent extends React.Component<
         closeButtonAriaLabel="Luk"
       >
         <Stack tokens={{ childrenGap: 15 }}>
-            <DatePicker
-              label="Fra"
-              firstDayOfWeek={DayOfWeek.Monday}
-              showWeekNumbers={true}
-              placeholder="Vælg start dato"
-              ariaLabel="Vælg start dato"
-              value={this.state.startDate}
-              onSelectDate={this.onStartDateChange}
-            />
-            <DatePicker
-              label="Til"
-              firstDayOfWeek={DayOfWeek.Monday}
-              showWeekNumbers={true}
-              placeholder="Vælg slut dato"
-              ariaLabel="Vælg slut dato"
-              value={this.state.endDate}
-              onSelectDate={this.onEndDateChange}
-            />
+          <DatePicker
+            label="Fra"
+            firstDayOfWeek={DayOfWeek.Monday}
+            showWeekNumbers={true}
+            placeholder="Vælg start dato"
+            ariaLabel="Vælg start dato"
+            value={this.state.startDate}
+            onSelectDate={this.onStartDateChange}
+          />
+          <DatePicker
+            label="Til"
+            firstDayOfWeek={DayOfWeek.Monday}
+            showWeekNumbers={true}
+            placeholder="Vælg slut dato"
+            ariaLabel="Vælg slut dato"
+            value={this.state.endDate}
+            onSelectDate={this.onEndDateChange}
+          />
 
           <TextField
             label="Title"
