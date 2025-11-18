@@ -1,6 +1,5 @@
 import * as React from "react";
-import { WebPartContext } from "@microsoft/sp-webpart-base";
-import { getSP } from "../../../pnpConfig";
+import { getSP } from "../../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
@@ -16,42 +15,16 @@ import {
   MessageBarType,
   PrimaryButton,
 } from "@fluentui/react";
-import RegisterForEvents from "./RegisterForEvents";
+import RegisterForEvents from "../RegisterForEvents";
+import { IListViewProps } from "../Utility/IListViewProps";
+import { IEventItem } from "../Utility/IEventItem";
+import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
 
-export interface IListViewProps {
-  context: WebPartContext;
-  startDate?: Date;
-  endDate?: Date;
-  selectedLocation?: string;
-  registered?: boolean;
-  cancelledEvents?: boolean;
-  waitlisted?: boolean;
-}
-
-interface IEventItem {
-  Id: number;
-  Title: string;
-  Dato?: string; // StartDato internal name is "Dato"
-  SlutDato?: string;
-  Administrator?: {
-    Title: string;
-  };
-  Placering?: string;
-  targetGroup?: string;
-  Beskrivelse?: string;
-  TilfoejEkstraInfo?: string;
-  Capacity?: number;
-}
-
-interface IListViewState {
-  events: IEventItem[];
-  isLoading: boolean;
-  error?: string;
+interface IListViewState extends BaseListViewState {
   registerPanelOpen: boolean;
-  selectedEventId?: number;
-  selectedEventTitle?: string;
   registeredEventIds: number[];
 }
+
 
 export default class ListView extends React.Component<
   IListViewProps,

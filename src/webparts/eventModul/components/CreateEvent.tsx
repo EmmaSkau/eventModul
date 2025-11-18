@@ -324,6 +324,12 @@ export default class CreateEvent extends React.Component<
             }}
           />
 
+          <DefaultButton
+            text="Tilføj flere felter"
+            //onClick={onClose}
+            //disabled={this.state.isSaving}
+          />
+
           <Stack horizontal tokens={{ childrenGap: 10 }}>
             <PrimaryButton
               text={eventToEdit ? "Gem ændringer" : "Gem event"}

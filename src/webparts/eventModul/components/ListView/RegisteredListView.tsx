@@ -1,6 +1,5 @@
 import * as React from "react";
-import { WebPartContext } from "@microsoft/sp-webpart-base";
-import { getSP } from "../../../pnpConfig";
+import { getSP } from "../../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
@@ -16,41 +15,9 @@ import {
   MessageBarType,
   DefaultButton,
 } from "@fluentui/react";
-
-export interface IListViewProps {
-  context: WebPartContext;
-  startDate?: Date;
-  endDate?: Date;
-  selectedLocation?: string;
-  registered?: boolean;
-  cancelledEvents?: boolean;
-  waitlisted?: boolean;
-}
-
-interface IEventItem {
-  Id: number;
-  Title: string;
-  Dato?: string; // StartDato internal name is "Dato"
-  SlutDato?: string;
-  Administrator?: {
-    Title: string;
-  };
-  Placering?: string;
-  targetGroup?: string;
-  Beskrivelse?: string;
-  TilfoejEkstraInfo?: string;
-  Capacity?: number;
-}
-
-interface IListViewState {
-  events: IEventItem[];
-  isLoading: boolean;
-  error?: string;
-  selectedEventId?: number;
-  selectedEventTitle?: string;
-  editPanelOpen: boolean;
-  selectedEventForEdit?: IEventItem;
-}
+import { IListViewProps } from "../Utility/IListViewProps";
+import { IEventItem } from "../Utility/IEventItem";
+import { IListViewState } from "../Utility/IListViewState";
 
 export default class RegisteredListView extends React.Component<
   IListViewProps,
@@ -61,7 +28,6 @@ export default class RegisteredListView extends React.Component<
     this.state = {
       events: [],
       isLoading: false,
-      editPanelOpen: false,
     };
   }
 
@@ -280,6 +246,14 @@ export default class RegisteredListView extends React.Component<
             return item.Placering;
           }
         },
+      },
+            {
+        key: "online",
+        name: "Online",
+        fieldName: "online",
+        minWidth: 100,
+        maxWidth: 150,
+        isResizable: true,
       },
       {
         key: "actions",

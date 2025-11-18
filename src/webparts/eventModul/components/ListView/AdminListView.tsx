@@ -1,6 +1,5 @@
 import * as React from "react";
-import { WebPartContext } from "@microsoft/sp-webpart-base";
-import { getSP } from "../../../pnpConfig";
+import { getSP } from "../../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
@@ -17,39 +16,12 @@ import {
   PrimaryButton,
   DefaultButton,
 } from "@fluentui/react";
-import CreateEvent from "./CreateEvent";
+import CreateEvent from "../CreateEvent";
+import { IListViewProps } from "../Utility/IListViewProps";
+import { IEventItem } from "../Utility/IEventItem";
+import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
 
-export interface IListViewProps {
-  context: WebPartContext;
-  startDate?: Date;
-  endDate?: Date;
-  selectedLocation?: string;
-  registered?: boolean;
-  cancelledEvents?: boolean;
-  waitlisted?: boolean;
-}
-
-interface IEventItem {
-  Id: number;
-  Title: string;
-  Dato?: string; // StartDato internal name is "Dato"
-  SlutDato?: string;
-  Administrator?: {
-    Title: string;
-  };
-  Placering?: string;
-  targetGroup?: string;
-  Beskrivelse?: string;
-  TilfoejEkstraInfo?: string;
-  Capacity?: number;
-}
-
-interface IListViewState {
-  events: IEventItem[];
-  isLoading: boolean;
-  error?: string;
-  selectedEventId?: number;
-  selectedEventTitle?: string;
+interface IListViewState extends BaseListViewState {
   editPanelOpen: boolean;
   selectedEventForEdit?: IEventItem;
 }
@@ -207,7 +179,7 @@ export default class AdminListView extends React.Component<
         key: "StartDato",
         name: "Start Dato",
         fieldName: "Dato",
-        minWidth: 100,
+        minWidth: 80,
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
@@ -218,7 +190,7 @@ export default class AdminListView extends React.Component<
         key: "SlutDato",
         name: "Slut Dato",
         fieldName: "SlutDato",
-        minWidth: 100,
+        minWidth: 80,
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
@@ -259,15 +231,23 @@ export default class AdminListView extends React.Component<
         key: "targetGroup",
         name: "Målgruppe",
         fieldName: "targetGroup",
-        minWidth: 100,
+        minWidth: 80,
         maxWidth: 150,
+        isResizable: true,
+      },
+      {
+        key: "tilmeldt",
+        name: "Tilmeldte",
+        fieldName: "tilmeldt",
+        minWidth: 70,
+        maxWidth: 100,
         isResizable: true,
       },
       {
         key: "Capacity",
         name: "Kapacitet",
         fieldName: "Capacity",
-        minWidth: 80,
+        minWidth: 70,
         maxWidth: 100,
         isResizable: true,
       },
@@ -275,7 +255,7 @@ export default class AdminListView extends React.Component<
         key: "actions",
         name: "Handlinger",
         fieldName: "actions",
-        minWidth: 200,
+        minWidth: 180,
         maxWidth: 250,
         isResizable: true,
         onRender: (item: IEventItem) => {

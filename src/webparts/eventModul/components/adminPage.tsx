@@ -4,7 +4,7 @@ import type { IEventModulProps } from "./IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
 import { PrimaryButton, ActionButton, IIconProps } from "@fluentui/react";
 import CreateEvent from "./CreateEvent";
-import AdminListView from "./AdminListView";
+import AdminListView from "./ListView/AdminListView";
 
 interface IAdminPageProps extends IEventModulProps {
   onClose?: () => void;

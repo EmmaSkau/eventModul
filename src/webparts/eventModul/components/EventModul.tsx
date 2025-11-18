@@ -16,8 +16,8 @@ import { getSP } from "../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
-import ListView from "./ListView";
-import RegisteredListView from "./RegisteredListView";
+import ListView from "./ListView/ListView";
+import RegisteredListView from "../components/ListView/RegisteredListView";
 import AdminPage from "./adminPage";
 
 interface ILocationItem {
@@ -56,6 +56,17 @@ export default class EventModul extends React.Component<
       showAdminPage: false,
     };
   }
+
+  private listViewRef = React.createRef<ListView>();
+  private registeredListViewRef = React.createRef<RegisteredListView>();
+
+  private handleRefresh = (): void => {
+    if (this.state.registered && this.registeredListViewRef.current) {
+      this.registeredListViewRef.current.loadEvents().catch(console.error);
+    } else if (this.listViewRef.current) {
+      this.listViewRef.current.loadEvents().catch(console.error);
+    }
+  };
 
   public componentDidMount(): void {
     this.loadLocationsFromSharePoint().catch((error) => {
@@ -226,11 +237,17 @@ export default class EventModul extends React.Component<
             text="Ryd filtre"
             onClick={this.resetFilters}
           />
+          <DefaultButton
+            text="Opdater liste"
+            iconProps={{ iconName: "Refresh" }}
+            onClick={this.handleRefresh}
+          />
         </section>
 
         <h2>{this.state.registered ? "Mine events:" : "Fremtidige events:"}</h2>
         {this.state.registered ? (
           <RegisteredListView
+            ref={this.registeredListViewRef}
             context={this.props.context}
             startDate={this.state.startDate}
             endDate={this.state.endDate}
@@ -238,6 +255,7 @@ export default class EventModul extends React.Component<
           />
         ) : (
           <ListView
+            ref={this.listViewRef}
             context={this.props.context}
             startDate={this.state.startDate}
             endDate={this.state.endDate}
