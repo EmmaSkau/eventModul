@@ -1,6 +1,6 @@
 import * as React from "react";
 import styles from "./EventModul.module.scss";
-import type { IEventModulProps } from "./IEventModulProps";
+import type { IEventModulProps } from "./Utility/IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
 import {
   DatePicker,

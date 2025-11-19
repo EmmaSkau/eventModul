@@ -10,7 +10,7 @@ import { IReadonlyTheme } from '@microsoft/sp-component-base';
 
 import * as strings from 'EventModulWebPartStrings';
 import EventModul from './components/EventModul';
-import { IEventModulProps } from './components/IEventModulProps';
+import { IEventModulProps } from './components/Utility/IEventModulProps';
 
 export interface IEventModulWebPartProps {
   description: string;
