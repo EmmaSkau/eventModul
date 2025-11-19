@@ -15,20 +15,13 @@ import {
   PanelType,
   DefaultButton,
   Stack,
+  Label,
+  IconButton,
+  Text,
 } from "@fluentui/react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
-
-interface IEventItem {
-  Id: number;
-  Title: string;
-  Dato?: string;
-  SlutDato?: string;
-  Administrator?: {
-    Title: string;
-  };
-  Placering?: string;
-  Capacity?: number;
-}
+import { IEventItem } from "../components/Utility/IEventItem";
+import AddFieldDialog, { ICustomField } from "./SpecialFields";
 
 interface ICreateEventProps {
   onClose?: () => void;
@@ -45,6 +38,9 @@ interface ICreateEventState {
   endDate?: Date;
   selectedLocation?: string;
   maxParticipants?: number;
+  customFields: ICustomField[];
+  isAddingField: boolean;
+  showFieldDialog: boolean;
 
   // Loading states
   isLoadingEmployees: boolean;
@@ -76,6 +72,9 @@ export default class CreateEvent extends React.Component<
       selectedLocation: isEditing ? eventToEdit!.Placering : undefined,
       maxParticipants:
         isEditing && eventToEdit!.Capacity ? eventToEdit!.Capacity : undefined,
+      customFields: [],
+      isAddingField: false,
+      showFieldDialog: false,
 
       // Loading states
       isLoadingEmployees: false,
@@ -89,6 +88,13 @@ export default class CreateEvent extends React.Component<
     this.loadLocationsFromSharePoint().catch((error) => {
       console.error("Error loading locations:", error);
     });
+
+    // Load custom fields if editing an existing event
+    if (this.props.eventToEdit) {
+      this.loadCustomFields(this.props.eventToEdit.Id).catch((error) => {
+        console.error("Error loading custom fields:", error);
+      });
+    }
   }
 
   public componentDidUpdate(prevProps: ICreateEventProps): void {
@@ -106,6 +112,11 @@ export default class CreateEvent extends React.Component<
         selectedLocation: eventToEdit.Placering,
         maxParticipants: eventToEdit.Capacity,
       });
+
+      // Load custom fields for the new event being edited
+      this.loadCustomFields(eventToEdit.Id).catch((error) => {
+        console.error("Error loading custom fields:", error);
+      });
     }
     // When switching from edit to create mode, clear the form
     else if (!this.props.eventToEdit && prevProps.eventToEdit) {
@@ -115,6 +126,7 @@ export default class CreateEvent extends React.Component<
         endDate: undefined,
         selectedLocation: undefined,
         maxParticipants: undefined,
+        customFields: [],
       });
     }
   }
@@ -168,6 +180,49 @@ export default class CreateEvent extends React.Component<
   ): void => {
     if (option) {
       this.setState({ selectedLocation: option.key as string });
+    }
+  };
+
+  // ADD CUSTOM FIELDS START
+  private openAddFieldDialog = (): void => {
+    this.setState({ showFieldDialog: true });
+  };
+
+  private addCustomField = (field: ICustomField): void => {
+    this.setState((prevState) => ({
+      customFields: [...prevState.customFields, field],
+      showFieldDialog: false,
+    }));
+  };
+
+  private cancelAddField = (): void => {
+    this.setState({ showFieldDialog: false });
+  };
+
+  private removeCustomField = (fieldId: string): void => {
+    this.setState((prevState) => ({
+      customFields: prevState.customFields.filter((f) => f.id !== fieldId),
+    }));
+  };
+
+  private loadCustomFields = async (eventId: number): Promise<void> => {
+    try {
+      const sp = getSP(this.props.context);
+      const fields = await sp.web.lists
+        .getByTitle("EventFields")
+        .items.filter(`EventId eq ${eventId}`)
+        .select("Id", "Title", "FeltType", "Valgmuligheder")();
+
+      const customFields: ICustomField[] = fields.map((item) => ({
+        id: item.Id.toString(),
+        fieldName: item.Title, 
+        fieldType: item.FeltType, 
+        options: item.Valgmuligheder ? JSON.parse(item.Valgmuligheder) : undefined, 
+      }));
+
+      this.setState({ customFields });
+    } catch (error) {
+      console.error("Error loading custom fields:", error);
     }
   };
 
@@ -228,17 +283,47 @@ export default class CreateEvent extends React.Component<
       };
 
       // Check if we're editing or creating
+      let eventId: number;
       if (this.props.eventToEdit) {
-        // UPDATE existing item
         await sp.web.lists
           .getByTitle("EventDB")
           .items.getById(this.props.eventToEdit.Id)
           .update(itemData);
+        eventId = this.props.eventToEdit.Id;
+
+        // Delete existing custom fields for this event
+        const existingFields = await sp.web.lists
+          .getByTitle("EventFields")
+          .items.filter(`EventId eq ${eventId}`)
+          .select("Id")();
+
+        for (const existingField of existingFields) {
+          await sp.web.lists
+            .getByTitle("EventFields")
+            .items.getById(existingField.Id)
+            .delete();
+        }
+
         alert("Event opdateret!");
       } else {
         // CREATE new item
-        await sp.web.lists.getByTitle("EventDB").items.add(itemData);
+        const addResult = await sp.web.lists
+          .getByTitle("EventDB")
+          .items.add(itemData);
+        eventId = addResult.data?.Id || addResult.Id;
         alert("Event oprettet!");
+      }
+
+      // Save custom fields to EventFields list (only if there are any)
+      if (this.state.customFields.length > 0) {
+        for (const field of this.state.customFields) {
+          await sp.web.lists.getByTitle("EventFields").items.add({
+            Title: field.fieldName, 
+            EventId: eventId, 
+            FeltType: field.fieldType,
+            Valgmuligheder: field.options ? JSON.stringify(field.options) : null,
+          });
+        }
       }
 
       // Notify parent that event was created/updated so ListView can refresh
@@ -324,10 +409,38 @@ export default class CreateEvent extends React.Component<
             }}
           />
 
+          {this.state.showFieldDialog && (
+            <AddFieldDialog
+              onAddField={this.addCustomField}
+              onCancel={this.cancelAddField}
+            />
+          )}
+
+          {this.state.customFields.length > 0 && (
+            <Stack tokens={{ childrenGap: 10 }}>
+              <Label>Brugerdefinerede felter:</Label>
+              {this.state.customFields.map((field) => (
+                <Stack
+                  key={field.id}
+                  horizontal
+                  horizontalAlign="space-between"
+                >
+                  <Text>
+                    {field.fieldName} ({field.fieldType})
+                  </Text>
+                  <IconButton
+                    iconProps={{ iconName: "Delete" }}
+                    onClick={() => this.removeCustomField(field.id)}
+                  />
+                </Stack>
+              ))}
+            </Stack>
+          )}
+
           <DefaultButton
             text="Tilføj flere felter"
-            //onClick={onClose}
-            //disabled={this.state.isSaving}
+            onClick={this.openAddFieldDialog}
+            disabled={this.state.isSaving}
           />
 
           <Stack horizontal tokens={{ childrenGap: 10 }}>

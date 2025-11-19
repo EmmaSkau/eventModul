@@ -164,9 +164,17 @@ export default class ListView extends React.Component<
       const sp = getSP(this.props.context);
       const currentUser = await sp.web.currentUser();
 
+      // Generate a unique registration key
+      const registrationKey = `${eventId}_${
+        this.props.context.pageContext.user.loginName
+      }_${new Date().getTime()}`;
+
       await sp.web.lists.getByTitle("EventRegistrations").items.add({
         Title: currentUser.Title,
         EventId: eventId,
+        BrugerId: currentUser.Id,
+        RegistrationKey: registrationKey,
+        Submitted: new Date().toISOString(),
       });
 
       alert("Du er nu tilmeldt eventet!");

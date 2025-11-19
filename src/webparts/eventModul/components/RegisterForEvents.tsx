@@ -31,9 +31,9 @@ export interface IRegisterForEventsProps {
 interface IEventField {
   Id: number;
   Title: string;
-  EventID: number;
-  FeltType: string; // "Text", "Dropdown", "Checkbox", etc.
-  Valgmuligheder?: string; // Comma-separated options for dropdowns
+  EventId: number;
+  FeltType: string; // "text", "multipleChoice"
+  Valgmuligheder?: string; // JSON string with options array
   P_x00e5_kr_x00e6_vet?: boolean; // "Påkrævet" (Required)
 }
 
@@ -76,31 +76,20 @@ export default class RegisterForEvents extends React.Component<
     try {
       this.setState({ isLoading: true, error: undefined });
       const sp = getSP(this.props.context);
-
-      // Debug: Get all fields to see their internal names
-      const allFields = await sp.web.lists
-        .getByTitle("EventFields")
-        .fields.select("Title", "InternalName", "TypeAsString")();
-      console.log("EventFields available fields:", allFields);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).eventFieldsTemp = allFields;
-      console.log(
-        "Search fields with: eventFieldsTemp.filter(f => f.Title?.includes('Event'))"
-      );
-
-      const fields: IEventField[] = await sp.web.lists
+      const allItems = await sp.web.lists
         .getByTitle("EventFields")
         .items.select(
           "Id",
           "Title",
-          "EventID",
+          "EventId",
           "FeltType",
           "Valgmuligheder",
           "P_x00e5_kr_x00e6_vet"
-        )
-        .filter(`EventID eq ${this.props.eventId}`)();
+        )();
 
-      console.log("Loaded event fields:", fields);
+      const fields: IEventField[] = allItems.filter(
+        (item) => item.EventId === this.props.eventId
+      );
 
       this.setState({
         fields,
@@ -156,24 +145,23 @@ export default class RegisterForEvents extends React.Component<
         this.props.context.pageContext.user.loginName
       }_${new Date().getTime()}`;
 
-      // Get current user
-      const currentUser = this.props.context.pageContext.user.loginName;
+      const currentUser = await sp.web.currentUser();
 
-      // Save each field value as a separate item in EventRegistrations
       for (const field of this.state.fields) {
         const value = this.state.fieldValues[field.Id];
         if (value !== undefined) {
-          await sp.web.lists.getByTitle("EventRegistrations").items.add({
+          const itemData = {
             Title: this.props.eventTitle,
-            Event: this.props.eventTitle,
-            EventID: this.props.eventId,
-            Bruger: currentUser,
+            EventId: this.props.eventId, 
+            BrugerId: currentUser.Id, 
             FieldName: field.Title,
             FieldType: field.FeltType,
             FieldValue: String(value),
             RegistrationKey: registrationKey,
             Submitted: new Date().toISOString(),
-          });
+          };
+
+          await sp.web.lists.getByTitle("EventRegistrations").items.add(itemData);
         }
       }
 
@@ -200,6 +188,7 @@ export default class RegisterForEvents extends React.Component<
     const value = this.state.fieldValues[field.Id] || "";
 
     switch (field.FeltType) {
+      case "text":
       case "Text":
       case "Tekst":
         return (
@@ -213,14 +202,27 @@ export default class RegisterForEvents extends React.Component<
           />
         );
 
+      case "multipleChoice":
       case "Dropdown":
       case "Valgmenu": {
-        const options: IDropdownOption[] = field.Valgmuligheder
-          ? field.Valgmuligheder.split(",").map((opt) => ({
+        // Parse the JSON string to get the options array
+        let options: IDropdownOption[] = [];
+        if (field.Valgmuligheder) {
+          try {
+            // Try to parse as JSON first (new format)
+            const optionsArray = JSON.parse(field.Valgmuligheder);
+            options = optionsArray.map((opt: string) => ({
+              key: opt,
+              text: opt,
+            }));
+          } catch {
+            // Fallback to comma-separated (old format)
+            options = field.Valgmuligheder.split(",").map((opt) => ({
               key: opt.trim(),
               text: opt.trim(),
-            }))
-          : [];
+            }));
+          }
+        }
         return (
           <Dropdown
             label={field.Title}
@@ -230,6 +232,7 @@ export default class RegisterForEvents extends React.Component<
             onChange={(_, option) =>
               this.onFieldChange(field.Id, (option?.key as string) || "")
             }
+            placeholder="Vælg en mulighed"
           />
         );
       }
@@ -245,6 +248,7 @@ export default class RegisterForEvents extends React.Component<
         );
 
       default:
+        console.warn("Unknown field type:", field.FeltType, "for field:", field.Title);
         return (
           <TextField
             label={field.Title}
