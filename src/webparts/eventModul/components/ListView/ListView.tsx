@@ -19,12 +19,12 @@ import RegisterForEvents from "../RegisterForEvents";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
 import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
+import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
 
 interface IListViewState extends BaseListViewState {
   registerPanelOpen: boolean;
   registeredEventIds: number[];
 }
-
 
 export default class ListView extends React.Component<
   IListViewProps,
@@ -129,6 +129,8 @@ export default class ListView extends React.Component<
       });
     }
 
+    filtered = getFutureEventsSorted(filtered);
+
     return filtered;
   };
 
@@ -179,7 +181,7 @@ export default class ListView extends React.Component<
 
       alert("Du er nu tilmeldt eventet!");
 
-      await this.loadUserRegistrations(); 
+      await this.loadUserRegistrations();
       await this.loadEvents();
     } catch (error) {
       console.error("Error registering for event:", error);
@@ -244,7 +246,7 @@ export default class ListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          return item.Dato ? new Date(item.Dato).toLocaleDateString("DK") : "-";
+          return item.Dato ? formatDate(item.Dato) : "-";
         },
       },
       {
@@ -255,9 +257,7 @@ export default class ListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          return item.SlutDato
-            ? new Date(item.SlutDato).toLocaleDateString("DK")
-            : "-";
+          return item.SlutDato ? formatDate(item.SlutDato) : "-";
         },
       },
       {
@@ -312,7 +312,8 @@ export default class ListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          const isRegistered = this.state.registeredEventIds.indexOf(item.Id) !== -1;
+          const isRegistered =
+            this.state.registeredEventIds.indexOf(item.Id) !== -1;
 
           return (
             <PrimaryButton

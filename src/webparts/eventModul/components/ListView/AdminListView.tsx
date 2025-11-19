@@ -20,6 +20,7 @@ import CreateEvent from "../CreateEvent";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
 import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
+import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
 
 interface IListViewState extends BaseListViewState {
   editPanelOpen: boolean;
@@ -126,6 +127,8 @@ export default class AdminListView extends React.Component<
         }
       });
     }
+    
+    filtered = getFutureEventsSorted(filtered);
 
     return filtered;
   };
@@ -183,7 +186,7 @@ export default class AdminListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          return item.Dato ? new Date(item.Dato).toLocaleDateString("DK") : "-";
+          return item.Dato ? formatDate(item.Dato) : "-";
         },
       },
       {
@@ -194,9 +197,7 @@ export default class AdminListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          return item.SlutDato
-            ? new Date(item.SlutDato).toLocaleDateString("DK")
-            : "-";
+          return item.SlutDato ? formatDate(item.SlutDato) : "-";
         },
       },
       {

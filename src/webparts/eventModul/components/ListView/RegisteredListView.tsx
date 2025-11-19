@@ -18,6 +18,7 @@ import {
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
 import { IListViewState } from "../Utility/IListViewState";
+import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
 
 export default class RegisteredListView extends React.Component<
   IListViewProps,
@@ -146,6 +147,8 @@ export default class RegisteredListView extends React.Component<
       });
     }
 
+    filtered = getFutureEventsSorted(filtered);
+
     return filtered;
   };
 
@@ -203,7 +206,7 @@ export default class RegisteredListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          return item.Dato ? new Date(item.Dato).toLocaleDateString("DK") : "-";
+          return item.Dato ? formatDate(item.Dato) : "-";
         },
       },
       {
@@ -214,9 +217,7 @@ export default class RegisteredListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          return item.SlutDato
-            ? new Date(item.SlutDato).toLocaleDateString("DK")
-            : "-";
+          return item.SlutDato ? formatDate(item.SlutDato) : "-";
         },
       },
       {
