@@ -17,8 +17,12 @@ import {
 } from "@fluentui/react";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
-import { IListViewState } from "../Utility/IListViewState";
+import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
 import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
+
+interface IListViewState extends BaseListViewState {
+  registeredEventIds: number[];
+}
 
 export default class RegisteredListView extends React.Component<
   IListViewProps,
@@ -29,6 +33,7 @@ export default class RegisteredListView extends React.Component<
     this.state = {
       events: [],
       isLoading: false,
+      registeredEventIds: [],
     };
   }
 
@@ -88,7 +93,8 @@ export default class RegisteredListView extends React.Component<
           "SlutDato",
           "Administrator/Title",
           "Placering",
-          "Capacity"
+          "Capacity",
+          "Online"
         )
         .expand("Administrator")
         .filter(idFilters)
@@ -248,13 +254,27 @@ export default class RegisteredListView extends React.Component<
           }
         },
       },
-            {
-        key: "online",
-        name: "Online",
-        fieldName: "online",
-        minWidth: 100,
-        maxWidth: 150,
+      {
+        key: "OnlineLink",
+        name: "Online Link",
+        fieldName: "Online",
+        minWidth: 120,
+        maxWidth: 200,
         isResizable: true,
+        onRender: (item: IEventItem) => {
+          if (item.Online?.Url) {
+            return (
+              <a
+                href={item.Online.Url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {item.Online.Description || "Join Online"}
+              </a>
+            );
+          }
+          return "-";
+        },
       },
       {
         key: "actions",

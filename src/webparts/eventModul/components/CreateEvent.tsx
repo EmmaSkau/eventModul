@@ -17,6 +17,7 @@ import {
   Label,
   IconButton,
   Text,
+  Checkbox,
 } from "@fluentui/react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { IEventItem } from "../components/Utility/IEventItem";
@@ -40,6 +41,8 @@ interface ICreateEventState {
   customFields: ICustomField[];
   isAddingField: boolean;
   showFieldDialog: boolean;
+  isOnline: boolean;
+  onlineLink?: string;
 
   // Loading states
   isLoadingEmployees: boolean;
@@ -73,6 +76,8 @@ export default class CreateEvent extends React.Component<
       customFields: [],
       isAddingField: false,
       showFieldDialog: false,
+      isOnline: false,
+      onlineLink: "",
 
       // Loading states
       isLoadingEmployees: false,
@@ -108,6 +113,8 @@ export default class CreateEvent extends React.Component<
           : undefined,
         selectedLocation: eventToEdit.Placering,
         maxParticipants: eventToEdit.Capacity,
+        isOnline: eventToEdit.Placering === "Online",
+        onlineLink: eventToEdit.Online?.Url || "",
       });
 
       // Load custom fields for the new event being edited
@@ -124,6 +131,8 @@ export default class CreateEvent extends React.Component<
         selectedLocation: undefined,
         maxParticipants: undefined,
         customFields: [],
+        isOnline: false,
+        onlineLink: "",
       });
     }
   }
@@ -166,6 +175,24 @@ export default class CreateEvent extends React.Component<
         locationOptions: [],
       });
     }
+  };
+
+  // ONLINE CHECKBOX START
+  private onOnlineCheckboxChange = (
+    event?: React.FormEvent<HTMLElement | HTMLInputElement>,
+    checked?: boolean
+  ): void => {
+    this.setState({
+      isOnline: !!checked,
+      onlineLink: checked ? this.state.onlineLink : "",
+    });
+  };
+
+  private onOnlineLinkChange = (
+    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+    newValue?: string
+  ): void => {
+    this.setState({ onlineLink: newValue });
   };
 
   // ADD CUSTOM FIELDS START
@@ -265,15 +292,26 @@ export default class CreateEvent extends React.Component<
         AdministratorId: number;
         Placering: string;
         Capacity: number | null;
+        Online?: {
+          Description: string;
+          Url: string;
+        } | null;
       } = {
         Title: title,
         Dato: startDate.toISOString(),
         SlutDato: endDate.toISOString(),
-        AdministratorId: currentUser.Id, // Person field needs user ID (integer)
-        Placering: selectedLocation || "",
+        AdministratorId: currentUser.Id,
+        Placering: this.state.isOnline ? "Online" : selectedLocation || "", 
         Capacity: maxParticipants
           ? parseInt(String(maxParticipants), 10)
           : null,
+        Online:
+          this.state.isOnline && this.state.onlineLink 
+            ? {
+                Description: "Online Link",
+                Url: this.state.onlineLink,
+              }
+            : null,
       };
 
       // Check if we're editing or creating
@@ -386,8 +424,23 @@ export default class CreateEvent extends React.Component<
             label="Placering"
             value={this.state.selectedLocation}
             onChange={this.onLocationChange}
-            required
+            disabled={this.state.isOnline}
           />
+
+          <Checkbox
+            label="Online?"
+            checked={this.state.isOnline}
+            onChange={this.onOnlineCheckboxChange}
+          />
+
+          {this.state.isOnline && (
+            <TextField
+              label="Online Link (Teams/møde link)"
+              placeholder="https://teams.microsoft.com/..."
+              value={this.state.onlineLink}
+              onChange={this.onOnlineLinkChange}
+            />
+          )}
 
           <TextField
             label="Kapacitet"

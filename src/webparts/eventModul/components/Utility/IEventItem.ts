@@ -11,4 +11,8 @@ export interface IEventItem {
   Beskrivelse?: string;
   TilfoejEkstraInfo?: string;
   Capacity?: number;
+  Online?: {
+    Description: string;
+    Url: string;
+  };
 }
