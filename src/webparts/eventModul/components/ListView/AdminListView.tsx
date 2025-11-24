@@ -25,6 +25,7 @@ import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
 interface IListViewState extends BaseListViewState {
   editPanelOpen: boolean;
   selectedEventForEdit?: IEventItem;
+  registrationCounts: { [eventId: number]: number };
 }
 
 export default class AdminListView extends React.Component<
@@ -37,10 +38,12 @@ export default class AdminListView extends React.Component<
       events: [],
       isLoading: false,
       editPanelOpen: false,
+      registrationCounts: {},
     };
   }
 
   public componentDidMount(): void {
+    this.loadRegistrationCounts().catch(console.error);
     this.loadEvents().catch(console.error);
   }
 
@@ -54,6 +57,30 @@ export default class AdminListView extends React.Component<
       this.loadEvents().catch(console.error);
     }
   }
+
+  private loadRegistrationCounts = async (): Promise<void> => {
+    try {
+      const sp = getSP(this.props.context);
+
+      // Get all registrations
+      const registrations = await sp.web.lists
+        .getByTitle("EventRegistrations")
+        .items.select("EventId")();
+
+      // Count registrations per event
+      const counts: { [eventId: number]: number } = {};
+
+      registrations.forEach((reg) => {
+        if (reg.EventId) {
+          counts[reg.EventId] = (counts[reg.EventId] || 0) + 1;
+        }
+      });
+
+      this.setState({ registrationCounts: counts });
+    } catch (error) {
+      console.error("Error loading registration counts:", error);
+    }
+  };
 
   public loadEvents = async (): Promise<void> => {
     try {
@@ -127,7 +154,7 @@ export default class AdminListView extends React.Component<
         }
       });
     }
-    
+
     filtered = getFutureEventsSorted(filtered);
 
     return filtered;
@@ -145,6 +172,7 @@ export default class AdminListView extends React.Component<
       editPanelOpen: false,
       selectedEventForEdit: undefined,
     });
+    this.loadRegistrationCounts().catch(console.error);
   };
 
   private handleDeleteEvent = async (item: IEventItem): Promise<void> => {
@@ -162,6 +190,7 @@ export default class AdminListView extends React.Component<
 
       // Reload the list
       await this.loadEvents();
+      await this.loadRegistrationCounts();
     } catch (error) {
       console.error("Error deleting event:", error);
       alert("Fejl ved sletning af event. Prøv igen.");
@@ -243,14 +272,14 @@ export default class AdminListView extends React.Component<
         minWidth: 70,
         maxWidth: 100,
         isResizable: true,
-      },
-      {
-        key: "Capacity",
-        name: "Kapacitet",
-        fieldName: "Capacity",
-        minWidth: 70,
-        maxWidth: 100,
-        isResizable: true,
+        onRender: (item: IEventItem) => {
+          const count = this.state.registrationCounts[item.Id] || 0;
+          const capacity = item.Capacity || 0;
+          if (capacity > 0) {
+            return `${count}/${capacity}`;
+          }
+          return count.toString();
+        },
       },
       {
         key: "actions",
