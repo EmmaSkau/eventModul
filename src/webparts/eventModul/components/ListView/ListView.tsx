@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getSP } from "../../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
@@ -18,50 +19,61 @@ import {
 import RegisterForEvents from "../RegisterForEvents";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
-import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
 import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
 
-interface IListViewState extends BaseListViewState {
-  registerPanelOpen: boolean;
-  registeredEventIds: number[];
-}
+const ListView: React.FC<IListViewProps> = (props) => {
+  // State declarations
+  const [events, setEvents] = useState<IEventItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [registerPanelOpen, setRegisterPanelOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<number | undefined>();
+  const [selectedEventTitle, setSelectedEventTitle] = useState<string | undefined>();
+  const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
 
-export default class ListView extends React.Component<
-  IListViewProps,
-  IListViewState
-> {
-  constructor(props: IListViewProps) {
-    super(props);
-    this.state = {
-      events: [],
-      isLoading: false,
-      registerPanelOpen: false,
-      registeredEventIds: [],
-    };
-  }
+  // Filter events based on props
+  const filterEvents = useCallback((items: IEventItem[]): IEventItem[] => {
+    let filtered = [...items];
 
-  public componentDidMount(): void {
-    this.loadEvents().catch(console.error);
-    this.loadUserRegistrations().catch(console.error); // Add this
-  }
-
-  public componentDidUpdate(prevProps: IListViewProps): void {
-    // Reload when filters change
-    if (
-      prevProps.startDate !== this.props.startDate ||
-      prevProps.endDate !== this.props.endDate ||
-      prevProps.selectedLocation !== this.props.selectedLocation
-    ) {
-      this.loadEvents().catch(console.error);
+    if (props.startDate) {
+      filtered = filtered.filter((item) => {
+        if (!item.Dato) return false;
+        const eventDate = new Date(item.Dato);
+        return eventDate >= props.startDate!;
+      });
     }
-  }
 
-  public loadEvents = async (): Promise<void> => {
+    if (props.endDate) {
+      filtered = filtered.filter((item) => {
+        if (!item.Dato) return false;
+        const eventDate = new Date(item.Dato);
+        return eventDate <= props.endDate!;
+      });
+    }
+
+    if (props.selectedLocation && props.selectedLocation !== "all") {
+      filtered = filtered.filter((item) => {
+        if (!item.Placering) return false;
+        try {
+          const parsed = JSON.parse(item.Placering);
+          return parsed.DisplayName === props.selectedLocation;
+        } catch {
+          return item.Placering === props.selectedLocation;
+        }
+      });
+    }
+
+    filtered = getFutureEventsSorted(filtered);
+    return filtered;
+  }, [props.startDate, props.endDate, props.selectedLocation]);
+
+  // Load events
+  const loadEvents = useCallback(async (): Promise<void> => {
     try {
-      this.setState({ isLoading: true, error: undefined });
-      const sp = getSP(this.props.context);
+      setIsLoading(true);
+      setError(undefined);
+      const sp = getSP(props.context);
 
-      // Get ALL items by explicitly requesting a large number
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
         .items.select(
@@ -74,143 +86,23 @@ export default class ListView extends React.Component<
           "Capacity"
         )
         .expand("Administrator")
-        .top(1000)(); // Request up to 1000 items
+        .top(1000)();
 
-      // Filter items based on props
-      const filteredItems = this.filterEvents(items);
+      const filteredItems = filterEvents(items);
 
-      this.setState({
-        events: filteredItems,
-        isLoading: false,
-      });
+      setEvents(filteredItems);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error loading events:", error);
-      this.setState({
-        isLoading: false,
-        error: "Kunne ikke indlæse events fra SharePoint",
-      });
+      setIsLoading(false);
+      setError("Kunne ikke indläse events fra SharePoint");
     }
-  };
+  }, [props.context, filterEvents]);
 
-  private filterEvents = (items: IEventItem[]): IEventItem[] => {
-    let filtered = [...items];
-
-    // Filter by start date
-    if (this.props.startDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate >= this.props.startDate!;
-      });
-    }
-
-    // Filter by end date
-    if (this.props.endDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate <= this.props.endDate!;
-      });
-    }
-
-    // Filter by location
-    if (this.props.selectedLocation && this.props.selectedLocation !== "all") {
-      filtered = filtered.filter((item) => {
-        if (!item.Placering) return false;
-
-        // Parse JSON to get DisplayName
-        try {
-          const parsed = JSON.parse(item.Placering);
-          return parsed.DisplayName === this.props.selectedLocation;
-        } catch {
-          // If not JSON, compare directly
-          return item.Placering === this.props.selectedLocation;
-        }
-      });
-    }
-
-    filtered = getFutureEventsSorted(filtered);
-
-    return filtered;
-  };
-
-  private closeRegisterPanel = (): void => {
-    this.setState({
-      registerPanelOpen: false,
-      selectedEventId: undefined,
-      selectedEventTitle: undefined,
-    });
-    this.loadEvents().catch(console.error);
-  };
-
-  // HANDLE REGISTRATIONS
-  private checkIfEventHasCustomFields = async (
-    eventId: number
-  ): Promise<boolean> => {
+  // Load user registrations
+  const loadUserRegistrations = useCallback(async (): Promise<void> => {
     try {
-      const sp = getSP(this.props.context);
-      const fields = await sp.web.lists
-        .getByTitle("EventFields")
-        .items.filter(`EventId eq ${eventId}`)
-        .select("Id")();
-
-      return fields.length > 0;
-    } catch (error) {
-      console.error("Error checking custom fields:", error);
-      return false;
-    }
-  };
-
-  private registerUserToEvent = async (eventId: number): Promise<void> => {
-    try {
-      const sp = getSP(this.props.context);
-      const currentUser = await sp.web.currentUser();
-
-      // Generate a unique registration key
-      const registrationKey = `${eventId}_${
-        this.props.context.pageContext.user.loginName
-      }_${new Date().getTime()}`;
-
-      await sp.web.lists.getByTitle("EventRegistrations").items.add({
-        Title: currentUser.Title,
-        EventId: eventId,
-        BrugerId: currentUser.Id,
-        RegistrationKey: registrationKey,
-        Submitted: new Date().toISOString(),
-      });
-
-      alert("Du er nu tilmeldt eventet!");
-
-      await this.loadUserRegistrations();
-      await this.loadEvents();
-    } catch (error) {
-      console.error("Error registering for event:", error);
-      alert("Fejl ved tilmelding. Prøv igen.");
-    }
-  };
-
-  private handleRegister = async (
-    eventId: number,
-    eventTitle: string
-  ): Promise<void> => {
-    const hasCustomFields = await this.checkIfEventHasCustomFields(eventId);
-
-    if (hasCustomFields) {
-      this.setState({
-        registerPanelOpen: true,
-        selectedEventId: eventId,
-        selectedEventTitle: eventTitle,
-      });
-    } else {
-      if (confirm(`Vil du tilmelde dig til "${eventTitle}"?`)) {
-        await this.registerUserToEvent(eventId);
-      }
-    }
-  };
-
-  private loadUserRegistrations = async (): Promise<void> => {
-    try {
-      const sp = getSP(this.props.context);
+      const sp = getSP(props.context);
       const currentUser = await sp.web.currentUser();
 
       const registrations = await sp.web.lists
@@ -222,13 +114,88 @@ export default class ListView extends React.Component<
         .map((reg) => reg.EventId)
         .filter((id) => id);
 
-      this.setState({ registeredEventIds });
+      setRegisteredEventIds(registeredEventIds);
     } catch (error) {
       console.error("Error loading user registrations:", error);
     }
+  }, [props.context]);
+
+  // Load data on mount
+  useEffect(() => {
+    loadEvents().catch(console.error);
+    loadUserRegistrations().catch(console.error);
+  }, []);
+
+  // Reload when filters change
+  useEffect(() => {
+    loadEvents().catch(console.error);
+  }, [loadEvents]);
+
+  // Check if event has custom fields
+  const checkIfEventHasCustomFields = useCallback(async (eventId: number): Promise<boolean> => {
+    try {
+      const sp = getSP(props.context);
+      const fields = await sp.web.lists
+        .getByTitle("EventFields")
+        .items.filter(`EventId eq ${eventId}`)
+        .select("Id")();
+
+      return fields.length > 0;
+    } catch (error) {
+      console.error("Error checking custom fields:", error);
+      return false;
+    }
+  }, [props.context]);
+
+  // Register user to event
+  const registerUserToEvent = useCallback(async (eventId: number): Promise<void> => {
+    try {
+      const sp = getSP(props.context);
+      const currentUser = await sp.web.currentUser();
+
+      const registrationKey = `${eventId}_${props.context.pageContext.user.loginName}_${new Date().getTime()}`;
+
+      await sp.web.lists.getByTitle("EventRegistrations").items.add({
+        Title: currentUser.Title,
+        EventId: eventId,
+        BrugerId: currentUser.Id,
+        RegistrationKey: registrationKey,
+        Submitted: new Date().toISOString(),
+      });
+
+      alert("Du er nu tilmeldt eventet!");
+
+      await loadUserRegistrations();
+      await loadEvents();
+    } catch (error) {
+      console.error("Error registering for event:", error);
+      alert("Fejl ved tilmelding. Prøv igen.");
+    }
+  }, [props.context, loadUserRegistrations, loadEvents]);
+
+  const handleRegister = async (eventId: number, eventTitle: string): Promise<void> => {
+    const hasCustomFields = await checkIfEventHasCustomFields(eventId);
+
+    if (hasCustomFields) {
+      setRegisterPanelOpen(true);
+      setSelectedEventId(eventId);
+      setSelectedEventTitle(eventTitle);
+    } else {
+      if (confirm(`Vil du tilmelde dig til "${eventTitle}"?`)) {
+        await registerUserToEvent(eventId);
+      }
+    }
   };
 
-  private getColumns = (): IColumn[] => {
+  // Close register panel
+  const closeRegisterPanel = (): void => {
+    setRegisterPanelOpen(false);
+    setSelectedEventId(undefined);
+    setSelectedEventTitle(undefined);
+    loadEvents().catch(console.error);
+  };
+
+  const getColumns = (): IColumn[] => {
     return [
       {
         key: "Title",
@@ -312,13 +279,12 @@ export default class ListView extends React.Component<
         maxWidth: 150,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          const isRegistered =
-            this.state.registeredEventIds.indexOf(item.Id) !== -1;
+          const isRegistered = registeredEventIds.indexOf(item.Id) !== -1;
 
           return (
             <PrimaryButton
               text={isRegistered ? "Tilmeldt" : "Tilmeld"}
-              onClick={() => this.handleRegister(item.Id, item.Title)}
+              onClick={() => handleRegister(item.Id, item.Title)}
               disabled={isRegistered}
             />
           );
@@ -327,54 +293,46 @@ export default class ListView extends React.Component<
     ];
   };
 
-  public render(): React.ReactElement<IListViewProps> {
-    const {
-      events,
-      isLoading,
-      error,
-      registerPanelOpen,
-      selectedEventId,
-      selectedEventTitle,
-    } = this.state;
+  // Render
+  if (isLoading) {
+    return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
+  }
 
-    if (isLoading) {
-      return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
-    }
-
-    if (error) {
-      return (
-        <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
-      );
-    }
-
-    if (events.length === 0) {
-      return (
-        <MessageBar messageBarType={MessageBarType.info}>
-          Ingen events fundet
-        </MessageBar>
-      );
-    }
-
+  if (error) {
     return (
-      <>
-        <DetailsList
-          items={events}
-          columns={this.getColumns()}
-          selectionMode={SelectionMode.none}
-          layoutMode={DetailsListLayoutMode.justified}
-          isHeaderVisible={true}
-        />
-
-        {registerPanelOpen && selectedEventId && selectedEventTitle && (
-          <RegisterForEvents
-            context={this.props.context}
-            eventId={selectedEventId}
-            eventTitle={selectedEventTitle}
-            isOpen={registerPanelOpen}
-            onDismiss={this.closeRegisterPanel}
-          />
-        )}
-      </>
+      <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
     );
   }
-}
+
+  if (events.length === 0) {
+    return (
+      <MessageBar messageBarType={MessageBarType.info}>
+        Ingen events fundet
+      </MessageBar>
+    );
+  }
+
+  return (
+    <>
+      <DetailsList
+        items={events}
+        columns={getColumns()}
+        selectionMode={SelectionMode.none}
+        layoutMode={DetailsListLayoutMode.justified}
+        isHeaderVisible={true}
+      />
+
+      {registerPanelOpen && selectedEventId && selectedEventTitle && (
+        <RegisterForEvents
+          context={props.context}
+          eventId={selectedEventId}
+          eventTitle={selectedEventTitle}
+          isOpen={registerPanelOpen}
+          onDismiss={closeRegisterPanel}
+        />
+      )}
+    </>
+  );
+};
+
+export default ListView;

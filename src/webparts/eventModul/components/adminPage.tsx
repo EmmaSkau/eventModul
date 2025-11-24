@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useCallback } from "react";
 import styles from "./EventModul.module.scss";
 import type { IEventModulProps } from "./Utility/IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
@@ -10,103 +11,88 @@ interface IAdminPageProps extends IEventModulProps {
   onClose?: () => void;
 }
 
-interface IEventModulState {
-  showCreateEvent: boolean;
-}
+const AdminPage: React.FC<IAdminPageProps> = (props) => {
+  // State
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-export default class AdminPage extends React.Component<
-  IAdminPageProps,
-  IEventModulState
-> {
-  private listViewRef = React.createRef<AdminListView>();
+  // Event handlers
+  const handleCreateEvent = useCallback((): void => {
+    setShowCreateEvent(true);
+  }, []);
 
-  constructor(props: IAdminPageProps) {
-    super(props);
-    this.state = {
-      showCreateEvent: false,
-    };
-  }
+  const handleCloseCreateEvent = useCallback((): void => {
+    setShowCreateEvent(false);
+  }, []);
 
-  private handleCreateEvent = (): void => {
-    this.setState({ showCreateEvent: true });
-  };
+  const handleEventCreated = useCallback((): void => {
+    setRefreshTrigger(prev => prev + 1);
 
-  private handleCloseCreateEvent = (): void => {
-    this.setState({ showCreateEvent: false });
-  };
+    const refreshTimes = [2000, 4000, 6000]; // Refresh at 2s, 4s, and 6s
+    refreshTimes.forEach((delay) => {
+      setTimeout(() => {
+        setRefreshTrigger(prev => prev + 1);
+      }, delay);
+    });
+  }, []);
 
-  private handleEventCreated = (): void => {
-    // Refresh the ListView when a new event is created
-    if (this.listViewRef.current) {
-      // Try multiple refreshes with increasing delays to catch the new item once SharePoint indexes it
-      const refreshTimes = [2000, 4000, 6000]; // Refresh at 2s, 4s, and 6s
-
-      refreshTimes.forEach((delay) => {
-        setTimeout(() => {
-          if (this.listViewRef.current) {
-            this.listViewRef.current.loadEvents().catch(console.error);
-          }
-        }, delay);
-      });
+  const handleCloseAdminPage = useCallback((): void => {
+    if (props.onClose) {
+      props.onClose();
     }
-  };
+  }, [props.onClose]);
 
-  private handleCloseAdminPage = (): void => {
-    if (this.props.onClose) {
-      this.props.onClose();
-    }
-  };
+  // Render
+  const { hasTeamsContext, userDisplayName } = props;
 
-  public render(): React.ReactElement<IAdminPageProps> {
-    const { hasTeamsContext, userDisplayName } = this.props;
+  const monthIcon: IIconProps = { iconName: "Calendar" };
+  const thisYearIcon: IIconProps = { iconName: "CalendarYear" };
 
-    const monthIcon: IIconProps = { iconName: "Calendar" };
-    const thisYearIcon: IIconProps = { iconName: "CalendarYear" };
-
-    return (
-      <section
-        className={`${styles.eventModul} ${
-          hasTeamsContext ? styles.teams : ""
-        }`}
-      >
-        <div className={styles.welcome}>
-          <h2>{escape(userDisplayName)}s Events</h2>
-          <p>Her kan du se alle dine events og oprette ny events</p>
-          <PrimaryButton
-            text="Luk Admin page"
-            onClick={this.handleCloseAdminPage}
-          />
-        </div>
-
-        <PrimaryButton text="Opret ny event" onClick={this.handleCreateEvent} />
-
-        <CreateEvent
-          isOpen={this.state.showCreateEvent}
-          onClose={this.handleCloseCreateEvent}
-          context={this.props.context}
-          onEventCreated={this.handleEventCreated}
+  return (
+    <section
+      className={`${styles.eventModul} ${
+        hasTeamsContext ? styles.teams : ""
+      }`}
+    >
+      <div className={styles.welcome}>
+        <h2>{escape(userDisplayName)}s Events</h2>
+        <p>Her kan du se alle dine events og oprette ny events</p>
+        <PrimaryButton
+          text="Luk Admin page"
+          onClick={handleCloseAdminPage}
         />
+      </div>
 
-        <div>
-          <ActionButton
-            iconProps={monthIcon}
-            allowDisabledFocus
-            disabled={false}
-            checked={false}
-          >
-            Denne måned
-          </ActionButton>
-          <ActionButton
-            iconProps={thisYearIcon}
-            allowDisabledFocus
-            disabled={false}
-            checked={false}
-          >
-            Dette år
-          </ActionButton>
-        </div>
-        <AdminListView ref={this.listViewRef} context={this.props.context} />
-      </section>
-    );
-  }
-}
+      <PrimaryButton text="Opret ny event" onClick={handleCreateEvent} />
+
+      <CreateEvent
+        isOpen={showCreateEvent}
+        onClose={handleCloseCreateEvent}
+        context={props.context}
+        onEventCreated={handleEventCreated}
+      />
+
+      <div>
+        <ActionButton
+          iconProps={monthIcon}
+          allowDisabledFocus
+          disabled={false}
+          checked={false}
+        >
+          Denne måned
+        </ActionButton>
+        <ActionButton
+          iconProps={thisYearIcon}
+          allowDisabledFocus
+          disabled={false}
+          checked={false}
+        >
+          Dette år
+        </ActionButton>
+      </div>
+      <AdminListView key={refreshTrigger} context={props.context} />
+    </section>
+  );
+};
+
+export default AdminPage;

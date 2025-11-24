@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useCallback } from "react";
 import {
   TextField,
   Dropdown,
@@ -20,52 +21,37 @@ interface IAddFieldDialogProps {
   onCancel: () => void;
 }
 
-interface IAddFieldDialogState {
-  newFieldName: string;
-  newFieldType: "text" | "multipleChoice";
-  newFieldOptions: string;
-}
+const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({ onAddField, onCancel }) => {
+  // State
+  const [newFieldName, setNewFieldName] = useState("");
+  const [newFieldType, setNewFieldType] = useState<"text" | "multipleChoice">("text");
+  const [newFieldOptions, setNewFieldOptions] = useState("");
 
-export default class AddFieldDialog extends React.Component<
-  IAddFieldDialogProps,
-  IAddFieldDialogState
-> {
-  constructor(props: IAddFieldDialogProps) {
-    super(props);
-
-    this.state = {
-      newFieldName: "",
-      newFieldType: "text",
-      newFieldOptions: "",
-    };
-  }
-
-  private onFieldNameChange = (
+  // Event handlers
+  const onFieldNameChange = useCallback((
     event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
     newValue?: string
   ): void => {
-    this.setState({ newFieldName: newValue || "" });
-  };
+    setNewFieldName(newValue || "");
+  }, []);
 
-  private onFieldTypeChange = (
+  const onFieldTypeChange = useCallback((
     event: React.FormEvent<HTMLDivElement>,
     option?: IDropdownOption
   ): void => {
     if (option) {
-      this.setState({ newFieldType: option.key as "text" | "multipleChoice" });
+      setNewFieldType(option.key as "text" | "multipleChoice");
     }
-  };
+  }, []);
 
-  private onFieldOptionsChange = (
+  const onFieldOptionsChange = useCallback((
     event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
     newValue?: string
   ): void => {
-    this.setState({ newFieldOptions: newValue || "" });
-  };
+    setNewFieldOptions(newValue || "");
+  }, []);
 
-  private handleAddField = (): void => {
-    const { newFieldName, newFieldType, newFieldOptions } = this.state;
-
+  const handleAddField = useCallback((): void => {
     // Validation
     if (!newFieldName.trim()) {
       alert("Indtast venligst et feltnavn");
@@ -89,71 +75,65 @@ export default class AddFieldDialog extends React.Component<
     };
 
     // Call the parent callback
-    this.props.onAddField(field);
+    onAddField(field);
 
     // Reset the form
-    this.setState({
-      newFieldName: "",
-      newFieldType: "text",
-      newFieldOptions: "",
-    });
-  };
+    setNewFieldName("");
+    setNewFieldType("text");
+    setNewFieldOptions("");
+  }, [newFieldName, newFieldType, newFieldOptions, onAddField]);
 
-  private handleCancel = (): void => {
+  const handleCancel = useCallback((): void => {
     // Reset the form
-    this.setState({
-      newFieldName: "",
-      newFieldType: "text",
-      newFieldOptions: "",
-    });
+    setNewFieldName("");
+    setNewFieldType("text");
+    setNewFieldOptions("");
 
     // Call parent cancel
-    this.props.onCancel();
-  };
+    onCancel();
+  }, [onCancel]);
 
-  public render(): React.ReactElement {
-    const { newFieldName, newFieldType, newFieldOptions } = this.state;
+  const fieldTypeOptions: IDropdownOption[] = [
+    { key: "text", text: "Tekstfelt" },
+    { key: "multipleChoice", text: "Flervalg" },
+  ];
 
-    const fieldTypeOptions: IDropdownOption[] = [
-      { key: "text", text: "Tekstfelt" },
-      { key: "multipleChoice", text: "Flervalg" },
-    ];
+  return (
+    <Stack tokens={{ childrenGap: 15 }} styles={{ root: { padding: '10px 0' } }}>
+      <TextField
+        label="Feltnavn"
+        placeholder="fx T-shirt størrelse"
+        value={newFieldName}
+        onChange={onFieldNameChange}
+        required
+      />
 
-    return (
-      <Stack tokens={{ childrenGap: 15 }} styles={{ root: { padding: '10px 0' } }}>
+      <Dropdown
+        label="Felttype"
+        options={fieldTypeOptions}
+        selectedKey={newFieldType}
+        onChange={onFieldTypeChange}
+        required
+      />
+
+      {newFieldType === "multipleChoice" && (
         <TextField
-          label="Feltnavn"
-          placeholder="fx T-shirt størrelse"
-          value={newFieldName}
-          onChange={this.onFieldNameChange}
+          label="Valgmuligheder (adskilt med komma)"
+          placeholder="Vegan, Vegetar, Ingen restriktioner"
+          multiline
+          rows={3}
+          value={newFieldOptions}
+          onChange={onFieldOptionsChange}
           required
         />
+      )}
 
-        <Dropdown
-          label="Felttype"
-          options={fieldTypeOptions}
-          selectedKey={newFieldType}
-          onChange={this.onFieldTypeChange}
-          required
-        />
-
-        {newFieldType === "multipleChoice" && (
-          <TextField
-            label="Valgmuligheder (adskilt med komma)"
-            placeholder="Vegan, Vegetar, Ingen restriktioner"
-            multiline
-            rows={3}
-            value={newFieldOptions}
-            onChange={this.onFieldOptionsChange}
-            required
-          />
-        )}
-
-        <Stack horizontal tokens={{ childrenGap: 10 }}>
-          <PrimaryButton text="Tilføj" onClick={this.handleAddField} />
-          <DefaultButton text="Annuller" onClick={this.handleCancel} />
-        </Stack>
+      <Stack horizontal tokens={{ childrenGap: 10 }}>
+        <PrimaryButton text="Tilføj" onClick={handleAddField} />
+        <DefaultButton text="Annuller" onClick={handleCancel} />
       </Stack>
-    );
-  }
-}
+    </Stack>
+  );
+};
+
+export default AddFieldDialog;

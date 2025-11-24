@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { getSP } from "../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
@@ -37,74 +38,52 @@ interface IRegisteredUser {
   Email?: string;
 }
 
-interface IManageRegistrationsState {
-  registeredUsers: IRegisteredUser[];
-  isLoading: boolean;
-  error?: string;
-  showAddUser: boolean;
-  searchResults: Array<{ Id: number; Title: string; Email: string }>;
-  searchText: string;
-  isSearching: boolean;
-}
+const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
+  const { isOpen, onDismiss, context, eventId, eventTitle } = props;
 
-export default class ManageRegistrations extends React.Component<
-  IManageRegistrationsProps,
-  IManageRegistrationsState
-> {
-  constructor(props: IManageRegistrationsProps) {
-    super(props);
-    this.state = {
-      registeredUsers: [],
-      isLoading: false,
-      showAddUser: false,
-      searchResults: [],
-      searchText: "",
-      isSearching: false,
-    };
-  }
+  // State
+  const [registeredUsers, setRegisteredUsers] = useState<IRegisteredUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ Id: number; Title: string; Email: string }>>([]);
+  const [searchText, setSearchText] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
-  public componentDidMount(): void {
-    if (this.props.isOpen) {
-      this.loadRegisteredUsers().catch(console.error);
-    }
-  }
-
-  public componentDidUpdate(prevProps: IManageRegistrationsProps): void {
-    if (this.props.isOpen && !prevProps.isOpen) {
-      this.loadRegisteredUsers().catch(console.error);
-    }
-  }
-
-  private loadRegisteredUsers = async (): Promise<void> => {
+  const loadRegisteredUsers = useCallback(async (): Promise<void> => {
     try {
-      this.setState({ isLoading: true, error: undefined });
-      const sp = getSP(this.props.context);
+      setIsLoading(true);
+      setError(undefined);
+      const sp = getSP(context);
 
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${this.props.eventId}`)
+        .items.filter(`EventId eq ${eventId}`)
         .select("Id", "Title", "BrugerId")();
 
-      this.setState({
-        registeredUsers: registrations,
-        isLoading: false,
-      });
+      setRegisteredUsers(registrations);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error loading registrations:", error);
-      this.setState({
-        isLoading: false,
-        error: "Kunne ikke indlæse tilmeldte brugere",
-      });
+      setIsLoading(false);
+      setError("Kunne ikke indlæse tilmeldte brugere");
     }
-  };
+  }, [context, eventId]);
 
-  private removeUser = async (registrationId: number): Promise<void> => {
-    if (!confirm("Er du sikker på, at du vil fjerne denne bruger?")) {
+  // Load registered users when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      loadRegisteredUsers().catch(console.error);
+    }
+  }, [isOpen, loadRegisteredUsers]);
+
+  const removeUser = useCallback(async (registrationId: number): Promise<void> => {
+    if (!confirm("Er du sikker p\u00e5, at du vil fjerne denne bruger?")) {
       return;
     }
 
     try {
-      const sp = getSP(this.props.context);
+      const sp = getSP(context);
 
       await sp.web.lists
         .getByTitle("EventRegistrations")
@@ -112,49 +91,50 @@ export default class ManageRegistrations extends React.Component<
         .delete();
 
       alert("Bruger fjernet!");
-      await this.loadRegisteredUsers();
+      await loadRegisteredUsers();
     } catch (error) {
       console.error("Error removing user:", error);
-      alert("Fejl ved fjernelse af bruger. Prøv igen.");
+      alert("Fejl ved fjernelse af bruger. Pr\u00f8v igen.");
     }
-  };
+  }, [context, loadRegisteredUsers]);
 
-  private searchUsers = async (searchText: string): Promise<void> => {
+  const searchUsers = useCallback(async (searchText: string): Promise<void> => {
     if (!searchText || searchText.length < 2) {
-      this.setState({ searchResults: [] });
+      setSearchResults([]);
       return;
     }
 
     try {
-      this.setState({ isSearching: true });
-      const sp = getSP(this.props.context);
+      setIsSearching(true);
+      const sp = getSP(context);
 
       // Search for users in SharePoint
       const users = await sp.web.siteUsers
         .filter(`substringof('${searchText}', Title)`)
         .top(10)();
 
-      const searchResults = users.map((user) => ({
+      const results = users.map((user) => ({
         Id: user.Id,
         Title: user.Title,
         Email: user.Email || "",
       }));
 
-      this.setState({ searchResults, isSearching: false });
+      setSearchResults(results);
+      setIsSearching(false);
     } catch (error) {
       console.error("Error searching users:", error);
-      this.setState({ isSearching: false });
+      setIsSearching(false);
     }
-  };
+  }, [context]);
 
-  private addUser = async (userId: number, userName: string): Promise<void> => {
+  const addUser = useCallback(async (userId: number, userName: string): Promise<void> => {
     try {
-      const sp = getSP(this.props.context);
+      const sp = getSP(context);
 
       // Check if user is already registered
       const existing = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${this.props.eventId} and BrugerId eq ${userId}`)
+        .items.filter(`EventId eq ${eventId} and BrugerId eq ${userId}`)
         .select("Id")();
 
       if (existing.length > 0) {
@@ -163,26 +143,28 @@ export default class ManageRegistrations extends React.Component<
       }
 
       // Add registration
-      const registrationKey = `${this.props.eventId}_${userId}_${new Date().getTime()}`;
+      const registrationKey = `${eventId}_${userId}_${new Date().getTime()}`;
 
       await sp.web.lists.getByTitle("EventRegistrations").items.add({
         Title: userName,
-        EventId: this.props.eventId,
+        EventId: eventId,
         BrugerId: userId,
         RegistrationKey: registrationKey,
         Submitted: new Date().toISOString(),
       });
 
       alert("Bruger tilmeldt!");
-      this.setState({ showAddUser: false, searchText: "", searchResults: [] });
-      await this.loadRegisteredUsers();
+      setShowAddUser(false);
+      setSearchText("");
+      setSearchResults([]);
+      await loadRegisteredUsers();
     } catch (error) {
       console.error("Error adding user:", error);
       alert("Fejl ved tilmelding af bruger. Prøv igen.");
     }
-  };
+  }, [context, eventId, loadRegisteredUsers]);
 
-  private getColumns = (): IColumn[] => {
+  const columns = useMemo((): IColumn[] => {
     return [
       {
         key: "Title",
@@ -204,25 +186,31 @@ export default class ManageRegistrations extends React.Component<
             <IconButton
               iconProps={{ iconName: "Delete" }}
               title="Fjern bruger"
-              onClick={() => this.removeUser(item.Id)}
+              onClick={() => removeUser(item.Id)}
             />
           );
         },
       },
     ];
-  };
+  }, [removeUser]);
 
-  public render(): React.ReactElement {
-    const { isOpen, onDismiss, eventTitle } = this.props;
-    const { registeredUsers, isLoading, error, showAddUser, searchResults, searchText, isSearching } = this.state;
+  const handleSearchChange = useCallback((newValue: string | undefined): void => {
+    const value = newValue || "";
+    setSearchText(value);
+    searchUsers(value).catch(console.error);
+  }, [searchUsers]);
 
-    return (
-      <Panel
-        isOpen={isOpen}
-        onDismiss={onDismiss}
-        type={PanelType.medium}
-        headerText={`Administrer tilmeldinger til - ${eventTitle}`}
-        closeButtonAriaLabel="Luk"
+  const handleToggleAddUser = useCallback((): void => {
+    setShowAddUser(prev => !prev);
+  }, []);
+
+  return (
+    <Panel
+      isOpen={isOpen}
+      onDismiss={onDismiss}
+      type={PanelType.medium}
+      headerText={`Administrer tilmeldinger til - ${eventTitle}`}
+      closeButtonAriaLabel="Luk"
       >
         <Stack tokens={{ childrenGap: 15 }}>
           {isLoading && <Spinner size={SpinnerSize.large} label="Indlæser..." />}
@@ -238,7 +226,7 @@ export default class ManageRegistrations extends React.Component<
                 <PrimaryButton
                   text="Tilføj bruger"
                   iconProps={{ iconName: "Add" }}
-                  onClick={() => this.setState({ showAddUser: !showAddUser })}
+                  onClick={handleToggleAddUser}
                 />
               </Stack>
 
@@ -247,10 +235,7 @@ export default class ManageRegistrations extends React.Component<
                   <SearchBox
                     placeholder="Søg efter bruger..."
                     value={searchText}
-                    onChange={(_, newValue) => {
-                      this.setState({ searchText: newValue || "" });
-                      this.searchUsers(newValue || "").catch(console.error);
-                    }}
+                    onChange={(_, newValue) => handleSearchChange(newValue)}
                   />
 
                   {isSearching && <Spinner size={SpinnerSize.small} />}
@@ -270,7 +255,7 @@ export default class ManageRegistrations extends React.Component<
                           </Stack>
                           <PrimaryButton
                             text="Tilføj"
-                            onClick={() => this.addUser(user.Id, user.Title)}
+                            onClick={() => addUser(user.Id, user.Title)}
                           />
                         </Stack>
                       ))}
@@ -282,7 +267,7 @@ export default class ManageRegistrations extends React.Component<
               {registeredUsers.length > 0 ? (
                 <DetailsList
                   items={registeredUsers}
-                  columns={this.getColumns()}
+                  columns={columns}
                   selectionMode={SelectionMode.none}
                   layoutMode={DetailsListLayoutMode.justified}
                   isHeaderVisible={true}
@@ -297,5 +282,6 @@ export default class ManageRegistrations extends React.Component<
         </Stack>
       </Panel>
     );
-  }
-}
+};
+
+export default ManageRegistrations;

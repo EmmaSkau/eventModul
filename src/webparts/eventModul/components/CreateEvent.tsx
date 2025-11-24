@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getSP } from "../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
@@ -9,7 +10,6 @@ import {
   DayOfWeek,
   PrimaryButton,
   TextField,
-  IDropdownOption,
   Panel,
   PanelType,
   DefaultButton,
@@ -31,255 +31,143 @@ interface ICreateEventProps {
   isOpen: boolean;
 }
 
-interface ICreateEventState {
-  // Form fields
-  title?: string;
-  startDate?: Date;
-  endDate?: Date;
-  selectedLocation?: string;
-  maxParticipants?: number;
-  customFields: ICustomField[];
-  isAddingField: boolean;
-  showFieldDialog: boolean;
-  isOnline: boolean;
-  onlineLink?: string;
+const CreateEvent: React.FC<ICreateEventProps> = (props) => {
+  const { context, eventToEdit, onEventCreated, onClose, isOpen } = props;
+
+  // Form fields state
+  const [title, setTitle] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [selectedLocation, setSelectedLocation] = useState<string | undefined>(undefined);
+  const [maxParticipants, setMaxParticipants] = useState<number | undefined>(undefined);
+  const [customFields, setCustomFields] = useState<ICustomField[]>([]);
+  const [showFieldDialog, setShowFieldDialog] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [onlineLink, setOnlineLink] = useState<string>("");
 
   // Loading states
-  isLoadingEmployees: boolean;
-  locationOptions: IDropdownOption[];
-  isSaving: boolean;
-}
+  const [isSaving, setIsSaving] = useState(false);
 
-export default class CreateEvent extends React.Component<
-  ICreateEventProps,
-  ICreateEventState
-> {
-  constructor(props: ICreateEventProps) {
-    super(props);
-    const eventToEdit = props.eventToEdit;
-    const isEditing = !!eventToEdit;
-
-    this.state = {
-      // Form fields
-      title: isEditing ? eventToEdit!.Title : "",
-      startDate:
-        isEditing && eventToEdit!.Dato
-          ? new Date(eventToEdit!.Dato)
-          : undefined,
-      endDate:
-        isEditing && eventToEdit!.SlutDato
-          ? new Date(eventToEdit!.SlutDato)
-          : undefined,
-      selectedLocation: isEditing ? eventToEdit!.Placering : undefined,
-      maxParticipants:
-        isEditing && eventToEdit!.Capacity ? eventToEdit!.Capacity : undefined,
-      customFields: [],
-      isAddingField: false,
-      showFieldDialog: false,
-      isOnline: false,
-      onlineLink: "",
-
-      // Loading states
-      isLoadingEmployees: false,
-      locationOptions: [],
-      isSaving: false,
-    };
-  }
-
-  public componentDidMount(): void {
-    this.loadLocationsFromSharePoint().catch((error) => {
-      console.error("Error loading locations:", error);
-    });
-
-    // Load custom fields if editing an existing event
-    if (this.props.eventToEdit) {
-      this.loadCustomFields(this.props.eventToEdit.Id).catch((error) => {
-        console.error("Error loading custom fields:", error);
-      });
-    }
-  }
-
-  public componentDidUpdate(prevProps: ICreateEventProps): void {
-    if (
-      this.props.eventToEdit &&
-      this.props.eventToEdit !== prevProps.eventToEdit
-    ) {
-      const eventToEdit = this.props.eventToEdit;
-      this.setState({
-        title: eventToEdit.Title,
-        startDate: eventToEdit.Dato ? new Date(eventToEdit.Dato) : undefined,
-        endDate: eventToEdit.SlutDato
-          ? new Date(eventToEdit.SlutDato)
-          : undefined,
-        selectedLocation: eventToEdit.Placering,
-        maxParticipants: eventToEdit.Capacity,
-        isOnline: eventToEdit.Placering === "Online",
-        onlineLink: eventToEdit.Online?.Url || "",
-      });
-
-      // Load custom fields for the new event being edited
-      this.loadCustomFields(eventToEdit.Id).catch((error) => {
-        console.error("Error loading custom fields:", error);
-      });
-    }
-    // When switching from edit to create mode, clear the form
-    else if (!this.props.eventToEdit && prevProps.eventToEdit) {
-      this.setState({
-        title: "",
-        startDate: undefined,
-        endDate: undefined,
-        selectedLocation: undefined,
-        maxParticipants: undefined,
-        customFields: [],
-        isOnline: false,
-        onlineLink: "",
-      });
-    }
-  }
-
-  // LOCATIONS START
-  private loadLocationsFromSharePoint = async (): Promise<void> => {
+  const loadCustomFields = useCallback(async (eventId: number): Promise<void> => {
     try {
-      const sp = getSP(this.props.context);
-
-      const items: { Placering: string }[] = await sp.web.lists
-        .getByTitle("EventDB")
-        .items.select("Placering")();
-
-      const locations = items
-        .map((item) => item.Placering)
-        .filter((location) => location);
-
-      const uniqueLocations: string[] = [];
-      const seen: { [key: string]: boolean } = {};
-      for (const location of locations) {
-        if (!seen[location]) {
-          seen[location] = true;
-          uniqueLocations.push(location);
-        }
-      }
-
-      const locationOptions: IDropdownOption[] = uniqueLocations.map(
-        (location) => ({
-          key: location,
-          text: location,
-        })
-      );
-
-      this.setState({
-        locationOptions,
-      });
-    } catch (error) {
-      console.error("Error loading locations from SharePoint:", error);
-      this.setState({
-        locationOptions: [],
-      });
-    }
-  };
-
-  // ONLINE CHECKBOX START
-  private onOnlineCheckboxChange = (
-    event?: React.FormEvent<HTMLElement | HTMLInputElement>,
-    checked?: boolean
-  ): void => {
-    this.setState({
-      isOnline: !!checked,
-      onlineLink: checked ? this.state.onlineLink : "",
-    });
-  };
-
-  private onOnlineLinkChange = (
-    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
-    newValue?: string
-  ): void => {
-    this.setState({ onlineLink: newValue });
-  };
-
-  // ADD CUSTOM FIELDS START
-  private openAddFieldDialog = (): void => {
-    this.setState({ showFieldDialog: true });
-  };
-
-  private addCustomField = (field: ICustomField): void => {
-    this.setState((prevState) => ({
-      customFields: [...prevState.customFields, field],
-      showFieldDialog: false,
-    }));
-  };
-
-  private cancelAddField = (): void => {
-    this.setState({ showFieldDialog: false });
-  };
-
-  private removeCustomField = (fieldId: string): void => {
-    this.setState((prevState) => ({
-      customFields: prevState.customFields.filter((f) => f.id !== fieldId),
-    }));
-  };
-
-  private loadCustomFields = async (eventId: number): Promise<void> => {
-    try {
-      const sp = getSP(this.props.context);
+      const sp = getSP(context);
       const fields = await sp.web.lists
         .getByTitle("EventFields")
         .items.filter(`EventId eq ${eventId}`)
-        .select("Id", "Title", "FeltType", "Valgmuligheder")();
-
-      const customFields: ICustomField[] = fields.map((item) => ({
-        id: item.Id.toString(),
-        fieldName: item.Title,
-        fieldType: item.FeltType,
-        options: item.Valgmuligheder
-          ? JSON.parse(item.Valgmuligheder)
-          : undefined,
-      }));
-
-      this.setState({ customFields });
+        .select("Id", "Title", "FeltType", "Valgmuligheder", "P_x00e5_kr_x00e6_vet")();
+      
+      setCustomFields(fields);
     } catch (error) {
       console.error("Error loading custom fields:", error);
     }
-  };
+  }, [context]);
 
-  // SAVE EVENT START
-  private onTitleChange = (
+  // Load custom fields when editing an event
+  useEffect(() => {
+    if (eventToEdit) {
+      loadCustomFields(eventToEdit.Id).catch((error) => {
+        console.error("Error loading custom fields:", error);
+      });
+    }
+  }, [eventToEdit?.Id, loadCustomFields]);
+
+  // Update form when eventToEdit changes
+  useEffect(() => {
+    if (eventToEdit) {
+      setTitle(eventToEdit.Title);
+      setStartDate(eventToEdit.Dato ? new Date(eventToEdit.Dato) : undefined);
+      setEndDate(eventToEdit.SlutDato ? new Date(eventToEdit.SlutDato) : undefined);
+      setSelectedLocation(eventToEdit.Placering);
+      setMaxParticipants(eventToEdit.Capacity);
+      setIsOnline(eventToEdit.Placering === "Online");
+      setOnlineLink(eventToEdit.Online?.Url || "");
+    } else {
+      // Clear form when switching to create mode
+      setTitle("");
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setSelectedLocation(undefined);
+      setMaxParticipants(undefined);
+      setCustomFields([]);
+      setIsOnline(false);
+      setOnlineLink("");
+    }
+  }, [eventToEdit]);
+
+  // ONLINE CHECKBOX START
+  const onOnlineCheckboxChange = useCallback((
+    event?: React.FormEvent<HTMLElement | HTMLInputElement>,
+    checked?: boolean
+  ): void => {
+    setIsOnline(!!checked);
+    if (!checked) {
+      setOnlineLink("");
+    }
+  }, []);
+
+  const onOnlineLinkChange = useCallback((
     event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
     newValue?: string
   ): void => {
-    this.setState({ title: newValue });
-  };
+    setOnlineLink(newValue || "");
+  }, []);
 
-  private onStartDateChange = (date: Date | null | undefined): void => {
-    this.setState({ startDate: date || undefined });
-  };
+  // ADD CUSTOM FIELDS START
+  const openAddFieldDialog = useCallback((): void => {
+    setShowFieldDialog(true);
+  }, []);
 
-  private onEndDateChange = (date: Date | null | undefined): void => {
-    this.setState({ endDate: date || undefined });
-  };
+  const addCustomField = useCallback((field: ICustomField): void => {
+    setCustomFields((prev) => [...prev, field]);
+    setShowFieldDialog(false);
+  }, []);
 
-  private onLocationChange = (
+  const cancelAddField = useCallback((): void => {
+    setShowFieldDialog(false);
+  }, []);
+
+  const removeCustomField = useCallback((fieldId: string): void => {
+    setCustomFields((prev) => prev.filter((f) => f.id !== fieldId));
+  }, []);
+
+  // FORM FIELD HANDLERS
+  const onTitleChange = useCallback((
     event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
     newValue?: string
   ): void => {
-    this.setState({ selectedLocation: newValue });
-  };
+    setTitle(newValue || "");
+  }, []);
 
-  private saveEvent = async (): Promise<void> => {
+  const onStartDateChange = useCallback((date: Date | null | undefined): void => {
+    setStartDate(date || undefined);
+  }, []);
+
+  const onEndDateChange = useCallback((date: Date | null | undefined): void => {
+    setEndDate(date || undefined);
+  }, []);
+
+  const onLocationChange = useCallback((
+    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+    newValue?: string
+  ): void => {
+    setSelectedLocation(newValue);
+  }, []);
+
+  // SAVE EVENT
+  const saveEvent = useCallback(async (): Promise<void> => {
     try {
-      this.setState({ isSaving: true });
-
-      const { title, startDate, endDate, selectedLocation, maxParticipants } =
-        this.state;
+      setIsSaving(true);
 
       // Validation
       if (!title || !startDate || !endDate) {
         alert(
           "Please fill in all required fields (Title, Start Date, End Date)"
         );
-        this.setState({ isSaving: false });
+        setIsSaving(false);
         return;
       }
 
-      const sp = getSP(this.props.context);
+      const sp = getSP(context);
 
       // Get current user's ID for the Administrator field
       const currentUser = await sp.web.currentUser();
@@ -301,27 +189,27 @@ export default class CreateEvent extends React.Component<
         Dato: startDate.toISOString(),
         SlutDato: endDate.toISOString(),
         AdministratorId: currentUser.Id,
-        Placering: this.state.isOnline ? "Online" : selectedLocation || "", 
+        Placering: isOnline ? "Online" : selectedLocation || "", 
         Capacity: maxParticipants
           ? parseInt(String(maxParticipants), 10)
           : null,
         Online:
-          this.state.isOnline && this.state.onlineLink 
+          isOnline && onlineLink 
             ? {
                 Description: "Online Link",
-                Url: this.state.onlineLink,
+                Url: onlineLink,
               }
             : null,
       };
 
       // Check if we're editing or creating
       let eventId: number;
-      if (this.props.eventToEdit) {
+      if (eventToEdit) {
         await sp.web.lists
           .getByTitle("EventDB")
-          .items.getById(this.props.eventToEdit.Id)
+          .items.getById(eventToEdit.Id)
           .update(itemData);
-        eventId = this.props.eventToEdit.Id;
+        eventId = eventToEdit.Id;
 
         // Delete existing custom fields for this event
         const existingFields = await sp.web.lists
@@ -347,8 +235,8 @@ export default class CreateEvent extends React.Component<
       }
 
       // Save custom fields to EventFields list (only if there are any)
-      if (this.state.customFields.length > 0) {
-        for (const field of this.state.customFields) {
+      if (customFields.length > 0) {
+        for (const field of customFields) {
           await sp.web.lists.getByTitle("EventFields").items.add({
             Title: field.fieldName,
             EventId: eventId,
@@ -361,145 +249,143 @@ export default class CreateEvent extends React.Component<
       }
 
       // Notify parent that event was created/updated so ListView can refresh
-      if (this.props.onEventCreated) {
-        this.props.onEventCreated();
+      if (onEventCreated) {
+        onEventCreated();
       }
 
-      this.setState({ isSaving: false });
+      setIsSaving(false);
 
       // Close the form
-      if (this.props.onClose) {
-        this.props.onClose();
+      if (onClose) {
+        onClose();
       }
     } catch (error) {
       console.error("Error saving event:", error);
       alert(
-        this.props.eventToEdit
+        eventToEdit
           ? "Fejl ved opdatering af event. Prøv igen."
           : "Fejl ved oprettelse af event. Prøv igen."
       );
-      this.setState({ isSaving: false });
+      setIsSaving(false);
     }
-  };
+  }, [title, startDate, endDate, context, isOnline, selectedLocation, maxParticipants, onlineLink, eventToEdit, customFields, onEventCreated, onClose]);
 
-  public render(): React.ReactElement {
-    const { isOpen, onClose, eventToEdit } = this.props;
+  return (
+    <Panel
+      isOpen={isOpen}
+      onDismiss={onClose}
+      type={PanelType.medium}
+      headerText={eventToEdit ? "Ret event" : "Opret ny event"}
+      closeButtonAriaLabel="Luk"
+    >
+      <Stack tokens={{ childrenGap: 15 }}>
+        <DatePicker
+          label="Fra"
+          firstDayOfWeek={DayOfWeek.Monday}
+          showWeekNumbers={true}
+          placeholder="Vælg start dato"
+          ariaLabel="Vælg start dato"
+          value={startDate}
+          onSelectDate={onStartDateChange}
+        />
+        <DatePicker
+          label="Til"
+          firstDayOfWeek={DayOfWeek.Monday}
+          showWeekNumbers={true}
+          placeholder="Vælg slut dato"
+          ariaLabel="Vælg slut dato"
+          value={endDate}
+          onSelectDate={onEndDateChange}
+        />
 
-    return (
-      <Panel
-        isOpen={isOpen}
-        onDismiss={onClose}
-        type={PanelType.medium}
-        headerText={eventToEdit ? "Ret event" : "Opret ny event"}
-        closeButtonAriaLabel="Luk"
-      >
-        <Stack tokens={{ childrenGap: 15 }}>
-          <DatePicker
-            label="Fra"
-            firstDayOfWeek={DayOfWeek.Monday}
-            showWeekNumbers={true}
-            placeholder="Vælg start dato"
-            ariaLabel="Vælg start dato"
-            value={this.state.startDate}
-            onSelectDate={this.onStartDateChange}
-          />
-          <DatePicker
-            label="Til"
-            firstDayOfWeek={DayOfWeek.Monday}
-            showWeekNumbers={true}
-            placeholder="Vælg slut dato"
-            ariaLabel="Vælg slut dato"
-            value={this.state.endDate}
-            onSelectDate={this.onEndDateChange}
-          />
+        <TextField
+          label="Title"
+          value={title}
+          onChange={onTitleChange}
+          required
+        />
 
+        <TextField
+          label="Placering"
+          value={selectedLocation}
+          onChange={onLocationChange}
+          disabled={isOnline}
+        />
+
+        <Checkbox
+          label="Online?"
+          checked={isOnline}
+          onChange={onOnlineCheckboxChange}
+        />
+
+        {isOnline && (
           <TextField
-            label="Title"
-            value={this.state.title}
-            onChange={this.onTitleChange}
-            required
+            label="Online Link (Teams/møde link)"
+            placeholder="https://teams.microsoft.com/..."
+            value={onlineLink}
+            onChange={onOnlineLinkChange}
           />
+        )}
 
-          <TextField
-            label="Placering"
-            value={this.state.selectedLocation}
-            onChange={this.onLocationChange}
-            disabled={this.state.isOnline}
+        <TextField
+          label="Kapacitet"
+          type="number"
+          value={maxParticipants?.toString() || ""}
+          onChange={(e, newValue) => {
+            const numValue = newValue ? parseInt(newValue, 10) : undefined;
+            setMaxParticipants(numValue);
+          }}
+        />
+
+        {showFieldDialog && (
+          <AddFieldDialog
+            onAddField={addCustomField}
+            onCancel={cancelAddField}
           />
+        )}
 
-          <Checkbox
-            label="Online?"
-            checked={this.state.isOnline}
-            onChange={this.onOnlineCheckboxChange}
-          />
-
-          {this.state.isOnline && (
-            <TextField
-              label="Online Link (Teams/møde link)"
-              placeholder="https://teams.microsoft.com/..."
-              value={this.state.onlineLink}
-              onChange={this.onOnlineLinkChange}
-            />
-          )}
-
-          <TextField
-            label="Kapacitet"
-            type="number"
-            value={this.state.maxParticipants?.toString() || ""}
-            onChange={(e, newValue) => {
-              const numValue = newValue ? parseInt(newValue, 10) : undefined;
-              this.setState({ maxParticipants: numValue });
-            }}
-          />
-
-          {this.state.showFieldDialog && (
-            <AddFieldDialog
-              onAddField={this.addCustomField}
-              onCancel={this.cancelAddField}
-            />
-          )}
-
-          {this.state.customFields.length > 0 && (
-            <Stack tokens={{ childrenGap: 10 }}>
-              <Label>Brugerdefinerede felter:</Label>
-              {this.state.customFields.map((field) => (
-                <Stack
-                  key={field.id}
-                  horizontal
-                  horizontalAlign="space-between"
-                >
-                  <Text>
-                    {field.fieldName} ({field.fieldType})
-                  </Text>
-                  <IconButton
-                    iconProps={{ iconName: "Delete" }}
-                    onClick={() => this.removeCustomField(field.id)}
-                  />
-                </Stack>
-              ))}
-            </Stack>
-          )}
-
-          <DefaultButton
-            text="Tilføj flere felter"
-            onClick={this.openAddFieldDialog}
-            disabled={this.state.isSaving}
-          />
-
-          <Stack horizontal tokens={{ childrenGap: 10 }}>
-            <PrimaryButton
-              text={eventToEdit ? "Gem ændringer" : "Gem event"}
-              onClick={this.saveEvent}
-              disabled={this.state.isSaving}
-            />
-            <DefaultButton
-              text="Annuller"
-              onClick={onClose}
-              disabled={this.state.isSaving}
-            />
+        {customFields.length > 0 && (
+          <Stack tokens={{ childrenGap: 10 }}>
+            <Label>Brugerdefinerede felter:</Label>
+            {customFields.map((field) => (
+              <Stack
+                key={field.id}
+                horizontal
+                horizontalAlign="space-between"
+              >
+                <Text>
+                  {field.fieldName} ({field.fieldType})
+                </Text>
+                <IconButton
+                  iconProps={{ iconName: "Delete" }}
+                  onClick={() => removeCustomField(field.id)}
+                />
+              </Stack>
+            ))}
           </Stack>
+        )}
+
+        <DefaultButton
+          text="Tilføj flere felter"
+          onClick={openAddFieldDialog}
+          disabled={isSaving}
+        />
+
+        <Stack horizontal tokens={{ childrenGap: 10 }}>
+          <PrimaryButton
+            text={eventToEdit ? "Gem ændringer" : "Gem event"}
+            onClick={saveEvent}
+            disabled={isSaving}
+          />
+          <DefaultButton
+            text="Annuller"
+            onClick={onClose}
+            disabled={isSaving}
+          />
         </Stack>
-      </Panel>
-    );
-  }
-}
+      </Stack>
+    </Panel>
+  );
+};
+
+export default CreateEvent;

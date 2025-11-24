@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getSP } from "../../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
@@ -17,69 +18,73 @@ import {
 } from "@fluentui/react";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
-import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
 import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
 
-interface IListViewState extends BaseListViewState {
-  registeredEventIds: number[];
-}
+const RegisteredListView: React.FC<IListViewProps> = (props) => {
+  // State declarations
+  const [events, setEvents] = useState<IEventItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
 
-export default class RegisteredListView extends React.Component<
-  IListViewProps,
-  IListViewState
-> {
-  constructor(props: IListViewProps) {
-    super(props);
-    this.state = {
-      events: [],
-      isLoading: false,
-      registeredEventIds: [],
-    };
-  }
+  // Filter events
+  const filterEvents = useCallback((items: IEventItem[]): IEventItem[] => {
+    let filtered = [...items];
 
-  public componentDidMount(): void {
-    this.loadEvents().catch(console.error);
-  }
-
-  public componentDidUpdate(prevProps: IListViewProps): void {
-    // Reload when filters change
-    if (
-      prevProps.startDate !== this.props.startDate ||
-      prevProps.endDate !== this.props.endDate ||
-      prevProps.selectedLocation !== this.props.selectedLocation
-    ) {
-      this.loadEvents().catch(console.error);
+    if (props.startDate) {
+      filtered = filtered.filter((item) => {
+        if (!item.Dato) return false;
+        const eventDate = new Date(item.Dato);
+        return eventDate >= props.startDate!;
+      });
     }
-  }
 
-  public loadEvents = async (): Promise<void> => {
+    if (props.endDate) {
+      filtered = filtered.filter((item) => {
+        if (!item.Dato) return false;
+        const eventDate = new Date(item.Dato);
+        return eventDate <= props.endDate!;
+      });
+    }
+
+    if (props.selectedLocation && props.selectedLocation !== "all") {
+      filtered = filtered.filter((item) => {
+        if (!item.Placering) return false;
+        try {
+          const parsed = JSON.parse(item.Placering);
+          return parsed.DisplayName === props.selectedLocation;
+        } catch {
+          return item.Placering === props.selectedLocation;
+        }
+      });
+    }
+
+    filtered = getFutureEventsSorted(filtered);
+    return filtered;
+  }, [props.startDate, props.endDate, props.selectedLocation]);
+
+  // Load events
+  const loadEvents = useCallback(async (): Promise<void> => {
     try {
-      this.setState({ isLoading: true, error: undefined });
-      const sp = getSP(this.props.context);
+      setIsLoading(true);
+      setError(undefined);
+      const sp = getSP(props.context);
       const currentUser = await sp.web.currentUser();
 
-      // Step 1: Get all EventIds where the current user is registered
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
         .items.filter(`Title eq '${currentUser.Title}'`)
         .select("EventId")();
 
-      // Extract the event IDs
       const registeredEventIds = registrations
         .map((reg) => reg.EventId)
         .filter((id) => id);
 
       if (registeredEventIds.length === 0) {
-        // User has no registrations
-        this.setState({
-          events: [],
-          isLoading: false,
-        });
+        setEvents([]);
+        setIsLoading(false);
         return;
       }
 
-      // Step 2: Get the events that match the registered event IDs
-      // Build filter for multiple IDs: (Id eq 1) or (Id eq 2) or (Id eq 3)
       const idFilters = registeredEventIds
         .map((id) => `Id eq ${id}`)
         .join(" or ");
@@ -100,79 +105,39 @@ export default class RegisteredListView extends React.Component<
         .filter(idFilters)
         .top(1000)();
 
-      // Apply additional filters from props (date range, location, etc.)
-      const filteredItems = this.filterEvents(items);
+      const filteredItems = filterEvents(items);
 
-      this.setState({
-        events: filteredItems,
-        isLoading: false,
-      });
+      setEvents(filteredItems);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error loading registered events:", error);
-      this.setState({
-        isLoading: false,
-        error: "Kunne ikke indlæse dine tilmeldte events",
-      });
+      setIsLoading(false);
+      setError("Kunne ikke indlæse dine tilmeldte events");
     }
-  };
+  }, [props.context, filterEvents]);
 
-  private filterEvents = (items: IEventItem[]): IEventItem[] => {
-    let filtered = [...items];
+  // Load data on mount
+  useEffect(() => {
+    loadEvents().catch(console.error);
+  }, []);
 
-    // Filter by start date
-    if (this.props.startDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate >= this.props.startDate!;
-      });
-    }
+  // Reload when filters change
+  useEffect(() => {
+    loadEvents().catch(console.error);
+  }, [loadEvents]);
 
-    // Filter by end date
-    if (this.props.endDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate <= this.props.endDate!;
-      });
-    }
-
-    // Filter by location
-    if (this.props.selectedLocation && this.props.selectedLocation !== "all") {
-      filtered = filtered.filter((item) => {
-        if (!item.Placering) return false;
-
-        // Parse JSON to get DisplayName
-        try {
-          const parsed = JSON.parse(item.Placering);
-          return parsed.DisplayName === this.props.selectedLocation;
-        } catch {
-          // If not JSON, compare directly
-          return item.Placering === this.props.selectedLocation;
-        }
-      });
-    }
-
-    filtered = getFutureEventsSorted(filtered);
-
-    return filtered;
-  };
-
-  private handleDeleteEvent = async (item: IEventItem): Promise<void> => {
-    if (
-      !confirm(`Er du sikker på, at du vil afmeldes "${item.Title}" event?`)
-    ) {
+  // Handle unregister from event
+  const handleDeleteEvent = async (item: IEventItem): Promise<void> => {
+    if (!confirm(`Er du sikker på, at du vil afmeldes "${item.Title}" event?`)) {
       return;
     }
 
     try {
-      const sp = getSP(this.props.context);
+      const sp = getSP(props.context);
       const currentUser = await sp.web.currentUser();
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(
-          `Title eq '${currentUser.Title}' and EventId eq ${item.Id}`
-        )
+        .items.filter(`Title eq '${currentUser.Title}' and EventId eq ${item.Id}`)
         .select("Id")();
 
       if (registrations.length === 0) {
@@ -187,14 +152,14 @@ export default class RegisteredListView extends React.Component<
 
       alert("Du er nu afmeldt eventet!");
 
-      await this.loadEvents();
+      await loadEvents();
     } catch (error) {
       console.error("Error unregistering from event:", error);
       alert("Fejl ved afmelding af event. Prøv igen.");
     }
   };
 
-  private getColumns = (): IColumn[] => {
+  const getColumns = (): IColumn[] => {
     return [
       {
         key: "Title",
@@ -287,7 +252,7 @@ export default class RegisteredListView extends React.Component<
           return (
             <DefaultButton
               text="Afmeld event"
-              onClick={() => this.handleDeleteEvent(item)}
+              onClick={() => handleDeleteEvent(item)}
             />
           );
         },
@@ -295,37 +260,36 @@ export default class RegisteredListView extends React.Component<
     ];
   };
 
-  public render(): React.ReactElement<IListViewProps> {
-    const { events, isLoading, error } = this.state;
+  // Render
+  if (isLoading) {
+    return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
+  }
 
-    if (isLoading) {
-      return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
-    }
-
-    if (error) {
-      return (
-        <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
-      );
-    }
-
-    if (events.length === 0) {
-      return (
-        <MessageBar messageBarType={MessageBarType.info}>
-          Ingen events fundet
-        </MessageBar>
-      );
-    }
-
+  if (error) {
     return (
-      <>
-        <DetailsList
-          items={events}
-          columns={this.getColumns()}
-          selectionMode={SelectionMode.none}
-          layoutMode={DetailsListLayoutMode.justified}
-          isHeaderVisible={true}
-        />
-      </>
+      <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
     );
   }
-}
+
+  if (events.length === 0) {
+    return (
+      <MessageBar messageBarType={MessageBarType.info}>
+        Ingen events fundet
+      </MessageBar>
+    );
+  }
+
+  return (
+    <>
+      <DetailsList
+        items={events}
+        columns={getColumns()}
+        selectionMode={SelectionMode.none}
+        layoutMode={DetailsListLayoutMode.justified}
+        isHeaderVisible={true}
+      />
+    </>
+  );
+};
+
+export default RegisteredListView;

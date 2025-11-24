@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { getSP } from "../../../pnpConfig";
 import "@pnp/sp/webs";
@@ -37,45 +38,22 @@ interface IEventField {
   P_x00e5_kr_x00e6_vet?: boolean; // "Påkrævet" (Required)
 }
 
-interface IRegisterForEventsState {
-  fields: IEventField[];
-  fieldValues: { [key: number]: string | boolean };
-  isLoading: boolean;
-  isSaving: boolean;
-  error?: string;
-  success?: string;
-}
+const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
+  const { context, eventId, eventTitle, isOpen, onDismiss } = props;
 
-export default class RegisterForEvents extends React.Component<
-  IRegisterForEventsProps,
-  IRegisterForEventsState
-> {
-  constructor(props: IRegisterForEventsProps) {
-    super(props);
-    this.state = {
-      fields: [],
-      fieldValues: {},
-      isLoading: false,
-      isSaving: false,
-    };
-  }
+  // State
+  const [fields, setFields] = useState<IEventField[]>([]);
+  const [fieldValues, setFieldValues] = useState<{ [key: number]: string | boolean }>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
+  const [success, setSuccess] = useState<string | undefined>(undefined);
 
-  public componentDidMount(): void {
-    if (this.props.isOpen) {
-      this.loadEventFields().catch(console.error);
-    }
-  }
-
-  public componentDidUpdate(prevProps: IRegisterForEventsProps): void {
-    if (this.props.isOpen && !prevProps.isOpen) {
-      this.loadEventFields().catch(console.error);
-    }
-  }
-
-  private loadEventFields = async (): Promise<void> => {
+  const loadEventFields = useCallback(async (): Promise<void> => {
     try {
-      this.setState({ isLoading: true, error: undefined });
-      const sp = getSP(this.props.context);
+      setIsLoading(true);
+      setError(undefined);
+      const sp = getSP(context);
       const allItems = await sp.web.lists
         .getByTitle("EventFields")
         .items.select(
@@ -87,72 +65,70 @@ export default class RegisterForEvents extends React.Component<
           "P_x00e5_kr_x00e6_vet"
         )();
 
-      const fields: IEventField[] = allItems.filter(
-        (item) => item.EventId === this.props.eventId
+      const eventFields: IEventField[] = allItems.filter(
+        (item) => item.EventId === eventId
       );
 
-      this.setState({
-        fields,
-        isLoading: false,
-      });
+      setFields(eventFields);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error loading event fields:", error);
-      this.setState({
-        isLoading: false,
-        error: "Kunne ikke indlæse tilmeldingsfelter",
-      });
+      setIsLoading(false);
+      setError("Kunne ikke indlæse tilmeldingsfelter");
     }
-  };
+  }, [context, eventId]);
 
-  private onFieldChange = (fieldId: number, value: string | boolean): void => {
-    this.setState((prevState) => ({
-      fieldValues: {
-        ...prevState.fieldValues,
-        [fieldId]: value,
-      },
+  // Load event fields when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      loadEventFields().catch(console.error);
+    }
+  }, [isOpen, loadEventFields]);
+
+  const onFieldChange = useCallback((fieldId: number, value: string | boolean): void => {
+    setFieldValues((prev) => ({
+      ...prev,
+      [fieldId]: value,
     }));
-  };
+  }, []);
 
-  private validateForm = (): boolean => {
-    const { fields, fieldValues } = this.state;
-
+  const validateForm = useCallback((): boolean => {
     for (const field of fields) {
       if (field.P_x00e5_kr_x00e6_vet) {
         const value = fieldValues[field.Id];
         if (value === undefined || value === "" || value === false) {
-          this.setState({
-            error: `Feltet "${field.Title}" er påkrævet`,
-          });
+          setError(`Feltet "${field.Title}" er p\u00e5kr\u00e6vet`);
           return false;
         }
       }
     }
 
     return true;
-  };
+  }, [fields, fieldValues]);
 
-  private handleSubmit = async (): Promise<void> => {
-    if (!this.validateForm()) {
+  const handleSubmit = useCallback(async (): Promise<void> => {
+    if (!validateForm()) {
       return;
     }
 
     try {
-      this.setState({ isSaving: true, error: undefined });
-      const sp = getSP(this.props.context);
+      setIsSaving(true);
+      setError(undefined);
+      const sp = getSP(context);
 
       // Generate a unique registration key
-      const registrationKey = `${this.props.eventId}_${
-        this.props.context.pageContext.user.loginName
+      const registrationKey = `${eventId}_${
+        context.pageContext.user.loginName
       }_${new Date().getTime()}`;
 
       const currentUser = await sp.web.currentUser();
 
-      for (const field of this.state.fields) {
-        const value = this.state.fieldValues[field.Id];
+      for (const field of fields) {
+        const value = fieldValues[field.Id];
         if (value !== undefined) {
           const itemData = {
-            Title: this.props.eventTitle,
-            EventId: this.props.eventId, 
+            Title: eventTitle,
+            EventId: eventId, 
             BrugerId: currentUser.Id, 
             FieldName: field.Title,
             FieldType: field.FeltType,
@@ -165,27 +141,23 @@ export default class RegisterForEvents extends React.Component<
         }
       }
 
-      this.setState({
-        isSaving: false,
-        success: "Du er nu tilmeldt eventet!",
-        fieldValues: {},
-      });
+      setIsSaving(false);
+      setSuccess("Du er nu tilmeldt eventet!");
+      setFieldValues({});
 
       // Close panel after 2 seconds
       setTimeout(() => {
-        this.props.onDismiss();
+        onDismiss();
       }, 2000);
     } catch (error) {
       console.error("Error submitting registration:", error);
-      this.setState({
-        isSaving: false,
-        error: "Kunne ikke gemme tilmeldingen. Prøv igen.",
-      });
+      setIsSaving(false);
+      setError("Kunne ikke gemme tilmeldingen. Prøv igen.");
     }
-  };
+  }, [validateForm, context, eventId, eventTitle, fields, fieldValues, onDismiss]);
 
-  private renderField = (field: IEventField): JSX.Element => {
-    const value = this.state.fieldValues[field.Id] || "";
+  const renderField = useCallback((field: IEventField): JSX.Element => {
+    const value = fieldValues[field.Id] || "";
 
     switch (field.FeltType) {
       case "text":
@@ -197,7 +169,7 @@ export default class RegisterForEvents extends React.Component<
             required={field.P_x00e5_kr_x00e6_vet}
             value={value as string}
             onChange={(_, newValue) =>
-              this.onFieldChange(field.Id, newValue || "")
+              onFieldChange(field.Id, newValue || "")
             }
           />
         );
@@ -230,7 +202,7 @@ export default class RegisterForEvents extends React.Component<
             options={options}
             selectedKey={value as string}
             onChange={(_, option) =>
-              this.onFieldChange(field.Id, (option?.key as string) || "")
+              onFieldChange(field.Id, (option?.key as string) || "")
             }
             placeholder="Vælg en mulighed"
           />
@@ -243,7 +215,7 @@ export default class RegisterForEvents extends React.Component<
           <Checkbox
             label={field.Title}
             checked={value as boolean}
-            onChange={(_, checked) => this.onFieldChange(field.Id, !!checked)}
+            onChange={(_, checked) => onFieldChange(field.Id, !!checked)}
           />
         );
 
@@ -255,65 +227,62 @@ export default class RegisterForEvents extends React.Component<
             required={field.P_x00e5_kr_x00e6_vet}
             value={value as string}
             onChange={(_, newValue) =>
-              this.onFieldChange(field.Id, newValue || "")
+              onFieldChange(field.Id, newValue || "")
             }
           />
         );
     }
-  };
+  }, [fieldValues, onFieldChange]);
 
-  public render(): React.ReactElement<IRegisterForEventsProps> {
-    const { isOpen, onDismiss, eventTitle } = this.props;
-    const { fields, isLoading, isSaving, error, success } = this.state;
+  return (
+    <Panel
+      isOpen={isOpen}
+      onDismiss={onDismiss}
+      type={PanelType.medium}
+      headerText={`Tilmeld til: ${eventTitle}`}
+      closeButtonAriaLabel="Luk"
+    >
+      {isLoading ? (
+        <Spinner size={SpinnerSize.large} label="Indlæser felter..." />
+      ) : (
+        <Stack tokens={{ childrenGap: 15 }}>
+          {error && (
+            <MessageBar messageBarType={MessageBarType.error}>
+              {error}
+            </MessageBar>
+          )}
+          {success && (
+            <MessageBar messageBarType={MessageBarType.success}>
+              {success}
+            </MessageBar>
+          )}
 
-    return (
-      <Panel
-        isOpen={isOpen}
-        onDismiss={onDismiss}
-        type={PanelType.medium}
-        headerText={`Tilmeld til: ${eventTitle}`}
-        closeButtonAriaLabel="Luk"
-      >
-        {isLoading ? (
-          <Spinner size={SpinnerSize.large} label="Indlæser felter..." />
-        ) : (
-          <Stack tokens={{ childrenGap: 15 }}>
-            {error && (
-              <MessageBar messageBarType={MessageBarType.error}>
-                {error}
-              </MessageBar>
-            )}
-            {success && (
-              <MessageBar messageBarType={MessageBarType.success}>
-                {success}
-              </MessageBar>
-            )}
+          {fields.length === 0 && !error && (
+            <MessageBar messageBarType={MessageBarType.info}>
+              Ingen ekstra felter krævet for dette event
+            </MessageBar>
+          )}
 
-            {fields.length === 0 && !error && (
-              <MessageBar messageBarType={MessageBarType.info}>
-                Ingen ekstra felter krævet for dette event
-              </MessageBar>
-            )}
+          {fields.map((field) => (
+            <div key={field.Id}>{renderField(field)}</div>
+          ))}
 
-            {fields.map((field) => (
-              <div key={field.Id}>{this.renderField(field)}</div>
-            ))}
-
-            <Stack horizontal tokens={{ childrenGap: 10 }}>
-              <PrimaryButton
-                text={isSaving ? "Gemmer..." : "Tilmeld"}
-                onClick={this.handleSubmit}
-                disabled={isSaving}
-              />
-              <DefaultButton
-                text="Annuller"
-                onClick={onDismiss}
-                disabled={isSaving}
-              />
-            </Stack>
+          <Stack horizontal tokens={{ childrenGap: 10 }}>
+            <PrimaryButton
+              text={isSaving ? "Gemmer..." : "Tilmeld"}
+              onClick={handleSubmit}
+              disabled={isSaving}
+            />
+            <DefaultButton
+              text="Annuller"
+              onClick={onDismiss}
+              disabled={isSaving}
+            />
           </Stack>
-        )}
-      </Panel>
-    );
-  }
-}
+        </Stack>
+      )}
+    </Panel>
+  );
+};
+
+export default RegisterForEvents;

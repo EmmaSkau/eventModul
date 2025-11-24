@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import styles from "./EventModul.module.scss";
 import type { IEventModulProps } from "./Utility/IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
@@ -24,60 +25,25 @@ interface ILocationItem {
   Placering: string;
 }
 
-interface IEventModulState {
-  isTrue: boolean;
-  startDate?: Date;
-  endDate?: Date;
-  selectedLocation?: string;
-  locationOptions: IDropdownOption[];
-  isLoadingLocations: boolean;
-  registered?: boolean;
-  cancelledEvents?: boolean;
-  waitlisted?: boolean;
-  showAdminPage: boolean;
-}
+const EventModul: React.FC<IEventModulProps> = (props) => {
+  const { hasTeamsContext, userDisplayName, context } = props;
 
-export default class EventModul extends React.Component<
-  IEventModulProps,
-  IEventModulState
-> {
-  constructor(props: IEventModulProps) {
-    super(props);
-    this.state = {
-      isTrue: false,
-      startDate: undefined,
-      endDate: undefined,
-      selectedLocation: undefined,
-      locationOptions: [],
-      isLoadingLocations: false,
-      registered: false,
-      cancelledEvents: false,
-      waitlisted: false,
-      showAdminPage: false,
-    };
-  }
+  // State
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [selectedLocation, setSelectedLocation] = useState<string | undefined>(undefined);
+  const [locationOptions, setLocationOptions] = useState<IDropdownOption[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  const [cancelledEvents, setCancelledEvents] = useState(false);
+  const [waitlisted, setWaitlisted] = useState(false);
+  const [showAdminPage, setShowAdminPage] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  private listViewRef = React.createRef<ListView>();
-  private registeredListViewRef = React.createRef<RegisteredListView>();
-
-  private handleRefresh = (): void => {
-    if (this.state.registered && this.registeredListViewRef.current) {
-      this.registeredListViewRef.current.loadEvents().catch(console.error);
-    } else if (this.listViewRef.current) {
-      this.listViewRef.current.loadEvents().catch(console.error);
-    }
-  };
-
-  public componentDidMount(): void {
-    this.loadLocationsFromSharePoint().catch((error) => {
-      console.error("Error in componentDidMount:", error);
-    });
-  }
-
-  private loadLocationsFromSharePoint = async (): Promise<void> => {
+  const loadLocationsFromSharePoint = useCallback(async (): Promise<void> => {
     try {
-      this.setState({ isLoadingLocations: true });
-      const sp = getSP(this.props.context);
+      setIsLoadingLocations(true);
+      const sp = getSP(context);
 
       // Get all items with Placering field (Location field can't be filtered in query)
       const items: ILocationItem[] = await sp.web.lists
@@ -106,7 +72,7 @@ export default class EventModul extends React.Component<
         }
       }
 
-      const locationOptions: IDropdownOption[] = [
+      const options: IDropdownOption[] = [
         { key: "all", text: "Alle lokationer" },
         ...uniqueLocations.map((location: string) => ({
           key: location,
@@ -114,155 +80,151 @@ export default class EventModul extends React.Component<
         })),
       ];
 
-      this.setState({
-        locationOptions,
-        isLoadingLocations: false,
-      });
+      setLocationOptions(options);
+      setIsLoadingLocations(false);
     } catch (error) {
       console.error("Error loading locations from SharePoint:", error);
-      this.setState({
-        isLoadingLocations: false,
-        locationOptions: [{ key: "all", text: "Alle lokationer" }],
-      });
+      setIsLoadingLocations(false);
+      setLocationOptions([{ key: "all", text: "Alle lokationer" }]);
     }
-  };
+  }, [context]);
 
-  private onLocationChange = (
+  // Load locations on mount
+  useEffect(() => {
+    loadLocationsFromSharePoint().catch((error) => {
+      console.error("Error in componentDidMount:", error);
+    });
+  }, [loadLocationsFromSharePoint]);
+
+  const onLocationChange = useCallback((
     event: React.FormEvent<HTMLDivElement>,
     option?: IDropdownOption
   ): void => {
     if (option) {
-      this.setState({ selectedLocation: option.key as string });
+      setSelectedLocation(option.key as string);
     }
-  };
+  }, []);
 
-  private onStartDateSelect = (date: Date | null | undefined): void => {
-    this.setState({ startDate: date || undefined });
-  };
+  const onStartDateSelect = useCallback((date: Date | null | undefined): void => {
+    setStartDate(date || undefined);
+  }, []);
 
-  private onEndDateSelect = (date: Date | null | undefined): void => {
-    this.setState({ endDate: date || undefined });
-  };
+  const onEndDateSelect = useCallback((date: Date | null | undefined): void => {
+    setEndDate(date || undefined);
+  }, []);
 
-  private resetFilters = (): void => {
-    this.setState({
-      startDate: undefined,
-      endDate: undefined,
-      selectedLocation: undefined,
-      registered: false,
-      cancelledEvents: false,
-      waitlisted: false,
-    });
-  };
+  const resetFilters = useCallback((): void => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setSelectedLocation(undefined);
+    setRegistered(false);
+    setCancelledEvents(false);
+    setWaitlisted(false);
+  }, []);
 
-  private handleOpenAdminPage = (): void => {
-    this.setState({ showAdminPage: true });
-  };
+  const handleRefresh = useCallback((): void => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
 
-  private handleCloseAdminPage = (): void => {
-    this.setState({ showAdminPage: false });
-  };
+  const handleOpenAdminPage = useCallback((): void => {
+    setShowAdminPage(true);
+  }, []);
 
-  public render(): React.ReactElement<IEventModulProps> {
-    const { hasTeamsContext, userDisplayName } = this.props;
-    const {
-      startDate,
-      endDate,
-      selectedLocation,
-      locationOptions,
-      isLoadingLocations,
-    } = this.state;
+  const handleCloseAdminPage = useCallback((): void => {
+    setShowAdminPage(false);
+  }, []);
 
-    return (
-      <section
-        className={`${styles.eventModul} ${
-          hasTeamsContext ? styles.teams : ""
-        }`}
-      >
-        {this.state.showAdminPage && (
-          <AdminPage {...this.props} onClose={this.handleCloseAdminPage} />
-        )}
+  return (
+    <section
+      className={`${styles.eventModul} ${
+        hasTeamsContext ? styles.teams : ""
+      }`}
+    >
+      {showAdminPage && (
+        <AdminPage {...props} onClose={handleCloseAdminPage} />
+      )}
 
-        <div className={styles.welcome}>
-          <h2>{escape(userDisplayName)}s Events</h2>
-          <p>Her kan du se alle dine events og fremtidige events</p>
-          <PrimaryButton text="Admin page" onClick={this.handleOpenAdminPage} />
-        </div>
+      <div className={styles.welcome}>
+        <h2>{escape(userDisplayName)}s Events</h2>
+        <p>Her kan du se alle dine events og fremtidige events</p>
+        <PrimaryButton text="Admin page" onClick={handleOpenAdminPage} />
+      </div>
 
-        <section className={styles.filters}>
-          <DatePicker
-            label="Fra"
-            firstDayOfWeek={DayOfWeek.Monday}
-            placeholder="Vælg start dato..."
-            ariaLabel="Vælg start dato"
-            value={startDate}
-            onSelectDate={this.onStartDateSelect}
-            formatDate={formatDate}
-          />
+      <section className={styles.filters}>
+        <DatePicker
+          label="Fra"
+          firstDayOfWeek={DayOfWeek.Monday}
+          placeholder="Vælg start dato..."
+          ariaLabel="Vælg start dato"
+          value={startDate}
+          onSelectDate={onStartDateSelect}
+          formatDate={formatDate}
+        />
 
-          <DatePicker
-            label="Til"
-            firstDayOfWeek={DayOfWeek.Monday}
-            placeholder="Vælg slut dato..."
-            ariaLabel="Vælg slut dato"
-            value={endDate}
-            onSelectDate={this.onEndDateSelect}
-            formatDate={formatDate}
-          />
+        <DatePicker
+          label="Til"
+          firstDayOfWeek={DayOfWeek.Monday}
+          placeholder="Vælg slut dato..."
+          ariaLabel="Vælg slut dato"
+          value={endDate}
+          onSelectDate={onEndDateSelect}
+          formatDate={formatDate}
+        />
 
-          <Dropdown
-            label="Lokation"
-            placeholder={
-              isLoadingLocations ? "Indlæser lokationer..." : "Vælg lokation..."
-            }
-            options={locationOptions}
-            selectedKey={selectedLocation}
-            onChange={this.onLocationChange}
-            disabled={isLoadingLocations}
-          />
-        </section>
-        <section className={styles.filterToggle}>
-          <Toggle
-            label="Tilmeldt"
-            checked={this.state.registered}
-            onChange={(_, checked) => this.setState({ registered: !!checked })}
-          />
-
-          <Toggle label="Afmeldt" checked={this.state.cancelledEvents} />
-
-          <Toggle label="Venteliste" checked={this.state.waitlisted} />
-
-          <DefaultButton
-            className={styles.restFilter}
-            text="Ryd filtre"
-            onClick={this.resetFilters}
-          />
-          <DefaultButton
-            text="Opdater liste"
-            iconProps={{ iconName: "Refresh" }}
-            onClick={this.handleRefresh}
-          />
-        </section>
-
-        <h2>{this.state.registered ? "Mine events:" : "Fremtidige events:"}</h2>
-        {this.state.registered ? (
-          <RegisteredListView
-            ref={this.registeredListViewRef}
-            context={this.props.context}
-            startDate={this.state.startDate}
-            endDate={this.state.endDate}
-            selectedLocation={this.state.selectedLocation}
-          />
-        ) : (
-          <ListView
-            ref={this.listViewRef}
-            context={this.props.context}
-            startDate={this.state.startDate}
-            endDate={this.state.endDate}
-            selectedLocation={this.state.selectedLocation}
-          />
-        )}
+        <Dropdown
+          label="Lokation"
+          placeholder={
+            isLoadingLocations ? "Indlæser lokationer..." : "Vælg lokation..."
+          }
+          options={locationOptions}
+          selectedKey={selectedLocation}
+          onChange={onLocationChange}
+          disabled={isLoadingLocations}
+        />
       </section>
-    );
-  }
-}
+      <section className={styles.filterToggle}>
+        <Toggle
+          label="Tilmeldt"
+          checked={registered}
+          onChange={(_, checked) => setRegistered(!!checked)}
+        />
+
+        <Toggle label="Afmeldt" checked={cancelledEvents} />
+
+        <Toggle label="Venteliste" checked={waitlisted} />
+
+        <DefaultButton
+          className={styles.restFilter}
+          text="Ryd filtre"
+          onClick={resetFilters}
+        />
+        <DefaultButton
+          text="Opdater liste"
+          iconProps={{ iconName: "Refresh" }}
+          onClick={handleRefresh}
+        />
+      </section>
+
+      <h2>{registered ? "Mine events:" : "Fremtidige events:"}</h2>
+      {registered ? (
+        <RegisteredListView
+          key={refreshTrigger}
+          context={context}
+          startDate={startDate}
+          endDate={endDate}
+          selectedLocation={selectedLocation}
+        />
+      ) : (
+        <ListView
+          key={refreshTrigger}
+          context={context}
+          startDate={startDate}
+          endDate={endDate}
+          selectedLocation={selectedLocation}
+        />
+      )}
+    </section>
+  );
+};
+
+export default EventModul;

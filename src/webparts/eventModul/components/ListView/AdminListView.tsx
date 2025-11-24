@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getSP } from "../../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
@@ -20,53 +21,29 @@ import {
 import CreateEvent from "../CreateEvent";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
-import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
 import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
 import ManageRegistrations from "../ManageRegistrations";
 
-interface IListViewState extends BaseListViewState {
-  editPanelOpen: boolean;
-  selectedEventForEdit?: IEventItem;
-  registrationCounts: { [eventId: number]: number };
-  manageRegistrationsOpen: boolean;
-  selectedEventForRegistrations?: IEventItem;
-}
+const AdminListView: React.FC<IListViewProps> = (props) => {
+  // State declarations
+  const [events, setEvents] = useState<IEventItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [editPanelOpen, setEditPanelOpen] = useState(false);
+  const [selectedEventForEdit, setSelectedEventForEdit] = useState<
+    IEventItem | undefined
+  >();
+  const [registrationCounts, setRegistrationCounts] = useState<{
+    [eventId: number]: number;
+  }>({});
+  const [manageRegistrationsOpen, setManageRegistrationsOpen] = useState(false);
+  const [selectedEventForRegistrations, setSelectedEventForRegistrations] =
+    useState<IEventItem | undefined>();
 
-export default class AdminListView extends React.Component<
-  IListViewProps,
-  IListViewState
-> {
-  constructor(props: IListViewProps) {
-    super(props);
-    this.state = {
-      events: [],
-      isLoading: false,
-      editPanelOpen: false,
-      registrationCounts: {},
-      manageRegistrationsOpen: false,
-      selectedEventForRegistrations: undefined,
-    };
-  }
-
-  public componentDidMount(): void {
-    this.loadRegistrationCounts().catch(console.error);
-    this.loadEvents().catch(console.error);
-  }
-
-  public componentDidUpdate(prevProps: IListViewProps): void {
-    // Reload when filters change
-    if (
-      prevProps.startDate !== this.props.startDate ||
-      prevProps.endDate !== this.props.endDate ||
-      prevProps.selectedLocation !== this.props.selectedLocation
-    ) {
-      this.loadEvents().catch(console.error);
-    }
-  }
-
-  private loadRegistrationCounts = async (): Promise<void> => {
+  // Load registration counts
+  const loadRegistrationCounts = useCallback(async (): Promise<void> => {
     try {
-      const sp = getSP(this.props.context);
+      const sp = getSP(props.context);
 
       // Get all registrations
       const registrations = await sp.web.lists
@@ -82,17 +59,62 @@ export default class AdminListView extends React.Component<
         }
       });
 
-      this.setState({ registrationCounts: counts });
+      setRegistrationCounts(counts);
     } catch (error) {
       console.error("Error loading registration counts:", error);
     }
-  };
+  }, [props.context]);
 
-  public loadEvents = async (): Promise<void> => {
+  // Filter events 
+  const filterEvents = useCallback(
+    (items: IEventItem[]): IEventItem[] => {
+      let filtered = [...items];
+
+      // Filter by start date
+      if (props.startDate) {
+        filtered = filtered.filter((item) => {
+          if (!item.Dato) return false;
+          const eventDate = new Date(item.Dato);
+          return eventDate >= props.startDate!;
+        });
+      }
+
+      // Filter by end date
+      if (props.endDate) {
+        filtered = filtered.filter((item) => {
+          if (!item.Dato) return false;
+          const eventDate = new Date(item.Dato);
+          return eventDate <= props.endDate!;
+        });
+      }
+
+      // Filter by location
+      if (props.selectedLocation && props.selectedLocation !== "all") {
+        filtered = filtered.filter((item) => {
+          if (!item.Placering) return false;
+          try {
+            const parsed = JSON.parse(item.Placering);
+            return parsed.DisplayName === props.selectedLocation;
+          } catch {
+            return item.Placering === props.selectedLocation;
+          }
+        });
+      }
+
+      filtered = getFutureEventsSorted(filtered);
+
+      return filtered;
+    },
+    [props.startDate, props.endDate, props.selectedLocation]
+  );
+
+  // Load events
+  const loadEvents = useCallback(async (): Promise<void> => {
     try {
-      this.setState({ isLoading: true, error: undefined });
-      const sp = getSP(this.props.context);
-      const currentUserEmail = this.props.context.pageContext.user.email;
+      setIsLoading(true);
+      setError(undefined);
+      const sp = getSP(props.context);
+      const currentUserEmail = props.context.pageContext.user.email;
 
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
@@ -109,117 +131,72 @@ export default class AdminListView extends React.Component<
         .filter(`Administrator/EMail eq '${currentUserEmail}'`)
         .top(1000)();
 
-      const filteredItems = this.filterEvents(items);
+      const filteredItems = filterEvents(items);
 
-      this.setState({
-        events: filteredItems,
-        isLoading: false,
-      });
+      setEvents(filteredItems);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error loading events:", error);
-      this.setState({
-        isLoading: false,
-        error: "Kunne ikke indlæse events fra SharePoint",
-      });
+      setIsLoading(false);
+      setError("Kunne ikke indlæse events fra SharePoint");
     }
+  }, [props.context, filterEvents]);
+
+  // Load data on mount
+  useEffect(() => {
+    loadRegistrationCounts().catch(console.error);
+    loadEvents().catch(console.error);
+  }, []); 
+
+  // Reload when filters change
+  useEffect(() => {
+    loadEvents().catch(console.error);
+  }, [loadEvents]);
+
+  // Event handlers
+  const handleEditEvent = (item: IEventItem): void => {
+    setEditPanelOpen(true);
+    setSelectedEventForEdit(item);
   };
 
-  private filterEvents = (items: IEventItem[]): IEventItem[] => {
-    let filtered = [...items];
-
-    // Filter by start date
-    if (this.props.startDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate >= this.props.startDate!;
-      });
-    }
-
-    // Filter by end date
-    if (this.props.endDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate <= this.props.endDate!;
-      });
-    }
-
-    // Filter by location
-    if (this.props.selectedLocation && this.props.selectedLocation !== "all") {
-      filtered = filtered.filter((item) => {
-        if (!item.Placering) return false;
-
-        // Parse JSON to get DisplayName
-        try {
-          const parsed = JSON.parse(item.Placering);
-          return parsed.DisplayName === this.props.selectedLocation;
-        } catch {
-          // If not JSON, compare directly
-          return item.Placering === this.props.selectedLocation;
-        }
-      });
-    }
-
-    filtered = getFutureEventsSorted(filtered);
-
-    return filtered;
+  const handleCloseEditPanel = (): void => {
+    setEditPanelOpen(false);
+    setSelectedEventForEdit(undefined);
+    loadRegistrationCounts().catch(console.error);
   };
 
-  private handleEditEvent = (item: IEventItem): void => {
-    this.setState({
-      editPanelOpen: true,
-      selectedEventForEdit: item,
-    });
-  };
-
-  private handleCloseEditPanel = (): void => {
-    this.setState({
-      editPanelOpen: false,
-      selectedEventForEdit: undefined,
-    });
-    this.loadRegistrationCounts().catch(console.error);
-  };
-
-  private handleDeleteEvent = async (item: IEventItem): Promise<void> => {
-    // Confirm before deleting
+  const handleDeleteEvent = async (item: IEventItem): Promise<void> => {
     if (!confirm(`Er du sikker på, at du vil slette "${item.Title}"?`)) {
       return;
     }
 
     try {
-      const sp = getSP(this.props.context);
+      const sp = getSP(props.context);
 
       await sp.web.lists.getByTitle("EventDB").items.getById(item.Id).delete();
 
       alert("Event slettet!");
 
-      // Reload the list
-      await this.loadEvents();
-      await this.loadRegistrationCounts();
+      await loadEvents();
+      await loadRegistrationCounts();
     } catch (error) {
       console.error("Error deleting event:", error);
       alert("Fejl ved sletning af event. Prøv igen.");
     }
   };
 
-  private openManageRegistrations = (item: IEventItem): void => {
-    this.setState({
-      manageRegistrationsOpen: true,
-      selectedEventForRegistrations: item,
-    });
+  const openManageRegistrations = (item: IEventItem): void => {
+    setManageRegistrationsOpen(true);
+    setSelectedEventForRegistrations(item);
   };
 
-  private closeManageRegistrations = (): void => {
-    this.setState({
-      manageRegistrationsOpen: false,
-      selectedEventForRegistrations: undefined,
-    });
-    // Refresh counts after managing registrations
-    this.loadRegistrationCounts().catch(console.error);
+  const closeManageRegistrations = (): void => {
+    setManageRegistrationsOpen(false);
+    setSelectedEventForRegistrations(undefined);
+    loadRegistrationCounts().catch(console.error);
   };
 
-  private getColumns = (): IColumn[] => {
+  const getColumns = (): IColumn[] => {
     return [
       {
         key: "Title",
@@ -295,7 +272,7 @@ export default class AdminListView extends React.Component<
         maxWidth: 120,
         isResizable: true,
         onRender: (item: IEventItem) => {
-          const count = this.state.registrationCounts[item.Id] || 0;
+          const count = registrationCounts[item.Id] || 0;
           const capacity = item.Capacity || 0;
           const displayText =
             capacity > 0 ? `${count}/${capacity}` : count.toString();
@@ -305,7 +282,7 @@ export default class AdminListView extends React.Component<
               <ActionButton
                 iconProps={{ iconName: "Edit" }}
                 title="Administrer tilmeldte"
-                onClick={() => this.openManageRegistrations(item)}
+                onClick={() => openManageRegistrations(item)}
               />
             </div>
           );
@@ -321,13 +298,10 @@ export default class AdminListView extends React.Component<
         onRender: (item: IEventItem) => {
           return (
             <div style={{ display: "flex", gap: "8px" }}>
-              <PrimaryButton
-                text="Ret"
-                onClick={() => this.handleEditEvent(item)}
-              />
+              <PrimaryButton text="Ret" onClick={() => handleEditEvent(item)} />
               <DefaultButton
                 text="Slet"
-                onClick={() => this.handleDeleteEvent(item)}
+                onClick={() => handleDeleteEvent(item)}
               />
             </div>
           );
@@ -336,56 +310,54 @@ export default class AdminListView extends React.Component<
     ];
   };
 
-  public render(): React.ReactElement<IListViewProps> {
-    const { events, isLoading, error } = this.state;
+  // Render
+  if (isLoading) {
+    return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
+  }
 
-    if (isLoading) {
-      return <Spinner size={SpinnerSize.large} label="Indlæser events..." />;
-    }
-
-    if (error) {
-      return (
-        <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
-      );
-    }
-
-    if (events.length === 0) {
-      return (
-        <MessageBar messageBarType={MessageBarType.info}>
-          Ingen events fundet
-        </MessageBar>
-      );
-    }
-
+  if (error) {
     return (
-      <>
-        <DetailsList
-          items={events}
-          columns={this.getColumns()}
-          selectionMode={SelectionMode.none}
-          layoutMode={DetailsListLayoutMode.justified}
-          isHeaderVisible={true}
-        />
-
-        <CreateEvent
-          isOpen={this.state.editPanelOpen}
-          onClose={this.handleCloseEditPanel}
-          context={this.props.context}
-          onEventCreated={this.loadEvents}
-          eventToEdit={this.state.selectedEventForEdit}
-        />
-
-        {this.state.manageRegistrationsOpen &&
-          this.state.selectedEventForRegistrations && (
-            <ManageRegistrations
-              isOpen={this.state.manageRegistrationsOpen}
-              onDismiss={this.closeManageRegistrations}
-              context={this.props.context}
-              eventId={this.state.selectedEventForRegistrations.Id}
-              eventTitle={this.state.selectedEventForRegistrations.Title}
-            />
-          )}
-      </>
+      <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>
     );
   }
-}
+
+  if (events.length === 0) {
+    return (
+      <MessageBar messageBarType={MessageBarType.info}>
+        Ingen events fundet
+      </MessageBar>
+    );
+  }
+
+  return (
+    <>
+      <DetailsList
+        items={events}
+        columns={getColumns()}
+        selectionMode={SelectionMode.none}
+        layoutMode={DetailsListLayoutMode.justified}
+        isHeaderVisible={true}
+      />
+
+      <CreateEvent
+        isOpen={editPanelOpen}
+        onClose={handleCloseEditPanel}
+        context={props.context}
+        onEventCreated={loadEvents}
+        eventToEdit={selectedEventForEdit}
+      />
+
+      {manageRegistrationsOpen && selectedEventForRegistrations && (
+        <ManageRegistrations
+          isOpen={manageRegistrationsOpen}
+          onDismiss={closeManageRegistrations}
+          context={props.context}
+          eventId={selectedEventForRegistrations.Id}
+          eventTitle={selectedEventForRegistrations.Title}
+        />
+      )}
+    </>
+  );
+};
+
+export default AdminListView;
