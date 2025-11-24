@@ -15,17 +15,21 @@ import {
   MessageBarType,
   PrimaryButton,
   DefaultButton,
+  ActionButton,
 } from "@fluentui/react";
 import CreateEvent from "../CreateEvent";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
 import { IListViewState as BaseListViewState } from "../Utility/IListViewState";
 import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
+import ManageRegistrations from "../ManageRegistrations";
 
 interface IListViewState extends BaseListViewState {
   editPanelOpen: boolean;
   selectedEventForEdit?: IEventItem;
   registrationCounts: { [eventId: number]: number };
+  manageRegistrationsOpen: boolean;
+  selectedEventForRegistrations?: IEventItem;
 }
 
 export default class AdminListView extends React.Component<
@@ -39,6 +43,8 @@ export default class AdminListView extends React.Component<
       isLoading: false,
       editPanelOpen: false,
       registrationCounts: {},
+      manageRegistrationsOpen: false,
+      selectedEventForRegistrations: undefined,
     };
   }
 
@@ -197,6 +203,22 @@ export default class AdminListView extends React.Component<
     }
   };
 
+  private openManageRegistrations = (item: IEventItem): void => {
+    this.setState({
+      manageRegistrationsOpen: true,
+      selectedEventForRegistrations: item,
+    });
+  };
+
+  private closeManageRegistrations = (): void => {
+    this.setState({
+      manageRegistrationsOpen: false,
+      selectedEventForRegistrations: undefined,
+    });
+    // Refresh counts after managing registrations
+    this.loadRegistrationCounts().catch(console.error);
+  };
+
   private getColumns = (): IColumn[] => {
     return [
       {
@@ -269,16 +291,24 @@ export default class AdminListView extends React.Component<
         key: "tilmeldt",
         name: "Tilmeldte",
         fieldName: "tilmeldt",
-        minWidth: 70,
-        maxWidth: 100,
+        minWidth: 100,
+        maxWidth: 120,
         isResizable: true,
         onRender: (item: IEventItem) => {
           const count = this.state.registrationCounts[item.Id] || 0;
           const capacity = item.Capacity || 0;
-          if (capacity > 0) {
-            return `${count}/${capacity}`;
-          }
-          return count.toString();
+          const displayText =
+            capacity > 0 ? `${count}/${capacity}` : count.toString();
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span>{displayText}</span>
+              <ActionButton
+                iconProps={{ iconName: "Edit" }}
+                title="Administrer tilmeldte"
+                onClick={() => this.openManageRegistrations(item)}
+              />
+            </div>
+          );
         },
       },
       {
@@ -344,6 +374,17 @@ export default class AdminListView extends React.Component<
           onEventCreated={this.loadEvents}
           eventToEdit={this.state.selectedEventForEdit}
         />
+
+        {this.state.manageRegistrationsOpen &&
+          this.state.selectedEventForRegistrations && (
+            <ManageRegistrations
+              isOpen={this.state.manageRegistrationsOpen}
+              onDismiss={this.closeManageRegistrations}
+              context={this.props.context}
+              eventId={this.state.selectedEventForRegistrations.Id}
+              eventTitle={this.state.selectedEventForRegistrations.Title}
+            />
+          )}
       </>
     );
   }
