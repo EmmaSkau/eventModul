@@ -9,7 +9,6 @@ import {
   DayOfWeek,
   PrimaryButton,
   TextField,
-  Dropdown,
   IDropdownOption,
   Panel,
   PanelType,
@@ -45,7 +44,6 @@ interface ICreateEventState {
   // Loading states
   isLoadingEmployees: boolean;
   locationOptions: IDropdownOption[];
-  isLoadingLocations: boolean;
   isSaving: boolean;
 }
 
@@ -79,7 +77,6 @@ export default class CreateEvent extends React.Component<
       // Loading states
       isLoadingEmployees: false,
       locationOptions: [],
-      isLoadingLocations: false,
       isSaving: false,
     };
   }
@@ -134,7 +131,6 @@ export default class CreateEvent extends React.Component<
   // LOCATIONS START
   private loadLocationsFromSharePoint = async (): Promise<void> => {
     try {
-      this.setState({ isLoadingLocations: true });
       const sp = getSP(this.props.context);
 
       const items: { Placering: string }[] = await sp.web.lists
@@ -163,23 +159,12 @@ export default class CreateEvent extends React.Component<
 
       this.setState({
         locationOptions,
-        isLoadingLocations: false,
       });
     } catch (error) {
       console.error("Error loading locations from SharePoint:", error);
       this.setState({
-        isLoadingLocations: false,
         locationOptions: [],
       });
-    }
-  };
-
-  private onLocationChange = (
-    event: React.FormEvent<HTMLDivElement>,
-    option?: IDropdownOption
-  ): void => {
-    if (option) {
-      this.setState({ selectedLocation: option.key as string });
     }
   };
 
@@ -215,9 +200,11 @@ export default class CreateEvent extends React.Component<
 
       const customFields: ICustomField[] = fields.map((item) => ({
         id: item.Id.toString(),
-        fieldName: item.Title, 
-        fieldType: item.FeltType, 
-        options: item.Valgmuligheder ? JSON.parse(item.Valgmuligheder) : undefined, 
+        fieldName: item.Title,
+        fieldType: item.FeltType,
+        options: item.Valgmuligheder
+          ? JSON.parse(item.Valgmuligheder)
+          : undefined,
       }));
 
       this.setState({ customFields });
@@ -240,6 +227,13 @@ export default class CreateEvent extends React.Component<
 
   private onEndDateChange = (date: Date | null | undefined): void => {
     this.setState({ endDate: date || undefined });
+  };
+
+  private onLocationChange = (
+    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+    newValue?: string
+  ): void => {
+    this.setState({ selectedLocation: newValue });
   };
 
   private saveEvent = async (): Promise<void> => {
@@ -318,10 +312,12 @@ export default class CreateEvent extends React.Component<
       if (this.state.customFields.length > 0) {
         for (const field of this.state.customFields) {
           await sp.web.lists.getByTitle("EventFields").items.add({
-            Title: field.fieldName, 
-            EventId: eventId, 
+            Title: field.fieldName,
+            EventId: eventId,
             FeltType: field.fieldType,
-            Valgmuligheder: field.options ? JSON.stringify(field.options) : null,
+            Valgmuligheder: field.options
+              ? JSON.stringify(field.options)
+              : null,
           });
         }
       }
@@ -386,17 +382,11 @@ export default class CreateEvent extends React.Component<
             required
           />
 
-          <Dropdown
+          <TextField
             label="Placering"
-            placeholder={
-              this.state.isLoadingLocations
-                ? "Indlæser lokationer..."
-                : "Vælg lokation..."
-            }
-            options={this.state.locationOptions}
-            selectedKey={this.state.selectedLocation}
+            value={this.state.selectedLocation}
             onChange={this.onLocationChange}
-            disabled={this.state.isLoadingLocations}
+            required
           />
 
           <TextField
