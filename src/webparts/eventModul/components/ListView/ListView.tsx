@@ -30,6 +30,34 @@ const ListView: React.FC<IListViewProps> = (props) => {
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>();
   const [selectedEventTitle, setSelectedEventTitle] = useState<string | undefined>();
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
+  const [registrationCounts, setRegistrationCounts] = useState<{
+      [eventId: number]: number;
+    }>({});
+
+    // Load registration counts
+      const loadRegistrationCounts = useCallback(async (): Promise<void> => {
+        try {
+          const sp = getSP(props.context);
+    
+          // Get all registrations
+          const registrations = await sp.web.lists
+            .getByTitle("EventRegistrations")
+            .items.select("EventId")();
+    
+          // Count registrations per event
+          const counts: { [eventId: number]: number } = {};
+    
+          registrations.forEach((reg) => {
+            if (reg.EventId) {
+              counts[reg.EventId] = (counts[reg.EventId] || 0) + 1;
+            }
+          });
+    
+          setRegistrationCounts(counts);
+        } catch (error) {
+          console.error("Error loading registration counts:", error);
+        }
+      }, [props.context]);
 
   // Filter events based on props
   const filterEvents = useCallback((items: IEventItem[]): IEventItem[] => {
@@ -124,6 +152,7 @@ const ListView: React.FC<IListViewProps> = (props) => {
   useEffect(() => {
     loadEvents().catch(console.error);
     loadUserRegistrations().catch(console.error);
+    loadRegistrationCounts().catch(console.error);
   }, []);
 
   // Reload when filters change
@@ -265,11 +294,17 @@ const ListView: React.FC<IListViewProps> = (props) => {
       },
       {
         key: "Capacity",
-        name: "Kapacitet",
+        name: "Ledige pladser",
         fieldName: "Capacity",
         minWidth: 80,
         maxWidth: 100,
         isResizable: true,
+        onRender: (item: IEventItem) => {
+          const count = registrationCounts[item.Id] || 0;
+          const capacity = item.Capacity || 0;
+          const available = capacity - count;
+          return capacity > 0 ? available.toString() : "-";
+        },
       },
       {
         key: "Tilmeld",
