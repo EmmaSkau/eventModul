@@ -42,13 +42,14 @@ const ListView: React.FC<IListViewProps> = (props) => {
           // Get all registrations
           const registrations = await sp.web.lists
             .getByTitle("EventRegistrations")
-            .items.select("EventId")();
+            .items.select("EventId", "EventType")();
     
           // Count registrations per event
           const counts: { [eventId: number]: number } = {};
     
           registrations.forEach((reg) => {
-            if (reg.EventId) {
+            // Count if EventType is not explicitly 'Waitlist'
+            if (reg.EventId && reg.EventType !== 'Waitlist') {
               counts[reg.EventId] = (counts[reg.EventId] || 0) + 1;
             }
           });
@@ -136,7 +137,7 @@ const ListView: React.FC<IListViewProps> = (props) => {
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
         .items.filter(`Title eq '${currentUser.Title}'`)
-        .select("EventId")();
+        .select("EventId", "EventType")();
 
       const registeredEventIds = registrations
         .map((reg) => reg.EventId)
@@ -177,7 +178,7 @@ const ListView: React.FC<IListViewProps> = (props) => {
   }, [props.context]);
 
   // Register user to event
-  const registerUserToEvent = useCallback(async (eventId: number): Promise<void> => {
+  const registerUserToEvent = useCallback(async (eventId: number, isWaitlist: boolean = false): Promise<void> => {
     try {
       const sp = getSP(props.context);
       const currentUser = await sp.web.currentUser();
@@ -190,19 +191,25 @@ const ListView: React.FC<IListViewProps> = (props) => {
         BrugerId: currentUser.Id,
         RegistrationKey: registrationKey,
         Submitted: new Date().toISOString(),
+        EventType: isWaitlist ? "Waitlist" : "Registered",
       });
 
-      alert("Du er nu tilmeldt eventet!");
+      if (isWaitlist) {
+        alert("Du er tilføjet til ventelisten!");
+      } else {
+        alert("Du er nu tilmeldt eventet!");
+      }
 
       await loadUserRegistrations();
       await loadEvents();
+      await loadRegistrationCounts();
     } catch (error) {
       console.error("Error registering for event:", error);
       alert("Fejl ved tilmelding. Prøv igen.");
     }
-  }, [props.context, loadUserRegistrations, loadEvents]);
+  }, [props.context, loadUserRegistrations, loadEvents, loadRegistrationCounts]);
 
-  const handleRegister = async (eventId: number, eventTitle: string): Promise<void> => {
+  const handleRegister = async (eventId: number, eventTitle: string, isWaitlist: boolean = false): Promise<void> => {
     const hasCustomFields = await checkIfEventHasCustomFields(eventId);
 
     if (hasCustomFields) {
@@ -210,8 +217,12 @@ const ListView: React.FC<IListViewProps> = (props) => {
       setSelectedEventId(eventId);
       setSelectedEventTitle(eventTitle);
     } else {
-      if (confirm(`Vil du tilmelde dig til "${eventTitle}"?`)) {
-        await registerUserToEvent(eventId);
+      const message = isWaitlist 
+        ? `Eventet er fuldt booket. Vil du tilføjes til ventelisten for "${eventTitle}"?`
+        : `Vil du tilmelde dig til "${eventTitle}"?`;
+      
+      if (confirm(message)) {
+        await registerUserToEvent(eventId, isWaitlist);
       }
     }
   };
@@ -315,11 +326,15 @@ const ListView: React.FC<IListViewProps> = (props) => {
         isResizable: true,
         onRender: (item: IEventItem) => {
           const isRegistered = registeredEventIds.indexOf(item.Id) !== -1;
+          const count = registrationCounts[item.Id] || 0;
+          const capacity = item.Capacity || 0;
+          const available = capacity - count;
+          const isFull = capacity > 0 && available <= 0;
 
           return (
             <PrimaryButton
-              text={isRegistered ? "Tilmeldt" : "Tilmeld"}
-              onClick={() => handleRegister(item.Id, item.Title)}
+              text={isRegistered ? "Tilmeldt" : isFull ? "Venteliste" : "Tilmeld"}
+              onClick={() => handleRegister(item.Id, item.Title, isFull)}
               disabled={isRegistered}
             />
           );

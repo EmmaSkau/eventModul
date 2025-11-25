@@ -70,10 +70,24 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
       const sp = getSP(props.context);
       const currentUser = await sp.web.currentUser();
 
+      // Build filter based on waitlisted toggle
+      let registrationFilter = `Title eq '${currentUser.Title}'`;
+      if (props.waitlisted) {
+        registrationFilter += " and EventType eq 'Waitlist'";
+      } else if (props.registered) {
+        registrationFilter += " and EventType ne 'Waitlist'";
+      }
+
+      console.log("RegisteredListView - waitlisted:", props.waitlisted); // DEBUG
+      console.log("RegisteredListView - registered:", props.registered); // DEBUG
+      console.log("RegisteredListView - filter:", registrationFilter); // DEBUG
+
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`Title eq '${currentUser.Title}'`)
-        .select("EventId")();
+        .items.filter(registrationFilter)
+        .select("EventId", "EventType")();
+
+      console.log("RegisteredListView - registrations found:", registrations); // DEBUG
 
       const registeredEventIds = registrations
         .map((reg) => reg.EventId)
@@ -114,7 +128,7 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
       setIsLoading(false);
       setError("Kunne ikke indlæse dine tilmeldte events");
     }
-  }, [props.context, filterEvents]);
+  }, [props.context, props.waitlisted, props.registered, filterEvents]);
 
   // Load data on mount
   useEffect(() => {

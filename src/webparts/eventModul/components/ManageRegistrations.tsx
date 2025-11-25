@@ -29,6 +29,7 @@ interface IManageRegistrationsProps {
   context: WebPartContext;
   eventId: number;
   eventTitle: string;
+  viewType?: 'registered' | 'waitlist';
 }
 
 interface IRegisteredUser {
@@ -39,7 +40,7 @@ interface IRegisteredUser {
 }
 
 const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
-  const { isOpen, onDismiss, context, eventId, eventTitle } = props;
+  const { isOpen, onDismiss, context, eventId, eventTitle, viewType = 'registered' } = props;
 
   // State
   const [registeredUsers, setRegisteredUsers] = useState<IRegisteredUser[]>([]);
@@ -56,19 +57,27 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       setError(undefined);
       const sp = getSP(context);
 
+      // Build filter based on viewType
+      let filter = `EventId eq ${eventId}`;
+      if (viewType === 'waitlist') {
+        filter += " and EventType eq 'Waitlist'";
+      } else if (viewType === 'registered') {
+        filter += " and EventType ne 'Waitlist'";
+      }
+
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${eventId}`)
-        .select("Id", "Title", "BrugerId")();
+        .items.filter(filter)
+        .select("Id", "Title", "BrugerId", "EventType")();
 
       setRegisteredUsers(registrations);
       setIsLoading(false);
     } catch (error) {
       console.error("Error loading registrations:", error);
       setIsLoading(false);
-      setError("Kunne ikke indlæse tilmeldte brugere");
+      setError("Kunne ikke indl\u00e6se tilmeldte brugere");
     }
-  }, [context, eventId]);
+  }, [context, eventId, viewType]);
 
   // Load registered users when panel opens
   useEffect(() => {
@@ -209,7 +218,9 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       isOpen={isOpen}
       onDismiss={onDismiss}
       type={PanelType.medium}
-      headerText={`Administrer tilmeldinger til - ${eventTitle}`}
+      headerText={viewType === 'waitlist' 
+        ? `Venteliste for - ${eventTitle}` 
+        : `Administrer tilmeldinger til - ${eventTitle}`}
       closeButtonAriaLabel="Luk"
       >
         <Stack tokens={{ childrenGap: 15 }}>
@@ -222,7 +233,11 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
           {!isLoading && !error && (
             <>
               <Stack horizontal horizontalAlign="space-between">
-                <h3>Tilmeldte brugere ({registeredUsers.length})</h3>
+                <h3>
+                  {viewType === 'waitlist' 
+                    ? `På venteliste (${registeredUsers.length})` 
+                    : `Tilmeldte brugere (${registeredUsers.length})`}
+                </h3>
                 <PrimaryButton
                   text="Tilføj bruger"
                   iconProps={{ iconName: "Add" }}

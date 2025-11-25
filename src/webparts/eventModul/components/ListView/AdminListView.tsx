@@ -39,6 +39,9 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
   const [manageRegistrationsOpen, setManageRegistrationsOpen] = useState(false);
   const [selectedEventForRegistrations, setSelectedEventForRegistrations] =
     useState<IEventItem | undefined>();
+  const [manageWaitlistOpen, setManageWaitlistOpen] = useState(false);
+  const [selectedEventForWaitlist, setSelectedEventForWaitlist] =
+    useState<IEventItem | undefined>();
 
   // Load registration counts
   const loadRegistrationCounts = useCallback(async (): Promise<void> => {
@@ -196,22 +199,33 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     loadRegistrationCounts().catch(console.error);
   };
 
+  const openManageWaitlist = (item: IEventItem): void => {
+    setManageWaitlistOpen(true);
+    setSelectedEventForWaitlist(item);
+  };
+
+  const closeManageWaitlist = (): void => {
+    setManageWaitlistOpen(false);
+    setSelectedEventForWaitlist(undefined);
+    loadRegistrationCounts().catch(console.error);
+  };
+
   const getColumns = (): IColumn[] => {
     return [
       {
         key: "Title",
         name: "Titel",
         fieldName: "Title",
-        minWidth: 150,
-        maxWidth: 200,
+        minWidth: 100,
+        maxWidth: 150,
         isResizable: true,
       },
       {
         key: "StartDato",
         name: "Start Dato",
         fieldName: "Dato",
-        minWidth: 80,
-        maxWidth: 150,
+        minWidth: 60,
+        maxWidth: 80,
         isResizable: true,
         onRender: (item: IEventItem) => {
           return item.Dato ? formatDate(item.Dato) : "-";
@@ -221,8 +235,8 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         key: "SlutDato",
         name: "Slut Dato",
         fieldName: "SlutDato",
-        minWidth: 80,
-        maxWidth: 150,
+        minWidth: 60,
+        maxWidth: 80,
         isResizable: true,
         onRender: (item: IEventItem) => {
           return item.SlutDato ? formatDate(item.SlutDato) : "-";
@@ -232,8 +246,8 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         key: "Administrator",
         name: "Administrator",
         fieldName: "Administrator",
-        minWidth: 100,
-        maxWidth: 150,
+        minWidth: 80,
+        maxWidth: 100,
         isResizable: true,
         onRender: (item: IEventItem) => {
           return item.Administrator?.Title || "-";
@@ -243,8 +257,8 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         key: "Placering",
         name: "Placering",
         fieldName: "Placering",
-        minWidth: 100,
-        maxWidth: 150,
+        minWidth: 80,
+        maxWidth: 100,
         isResizable: true,
         onRender: (item: IEventItem) => {
           if (!item.Placering) return "-";
@@ -261,15 +275,15 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         name: "Målgruppe",
         fieldName: "targetGroup",
         minWidth: 80,
-        maxWidth: 150,
+        maxWidth: 120,
         isResizable: true,
       },
       {
         key: "tilmeldt",
         name: "Tilmeldte",
         fieldName: "tilmeldt",
-        minWidth: 100,
-        maxWidth: 120,
+        minWidth: 80,
+        maxWidth: 100,
         isResizable: true,
         onRender: (item: IEventItem) => {
           const count = registrationCounts[item.Id] || 0;
@@ -277,7 +291,7 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           const displayText =
             capacity > 0 ? `${count}/${capacity}` : count.toString();
           return (
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center"}}>
               <span>{displayText}</span>
               <ActionButton
                 iconProps={{ iconName: "Edit" }}
@@ -293,13 +307,15 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         name: "Handlinger",
         fieldName: "actions",
         minWidth: 180,
-        maxWidth: 250,
+        maxWidth: 400,
         isResizable: true,
+        flexGrow: 1,
         onRender: (item: IEventItem) => {
           return (
             <div style={{ display: "flex", gap: "8px" }}>
-              <PrimaryButton text="Ret" onClick={() => handleEditEvent(item)} />
-              <DefaultButton
+              <DefaultButton text="venteliste" onClick={() => openManageWaitlist(item)} />
+              <DefaultButton text="Ret" onClick={() => handleEditEvent(item)} />
+              <PrimaryButton
                 text="Slet"
                 onClick={() => handleDeleteEvent(item)}
               />
@@ -354,6 +370,17 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           context={props.context}
           eventId={selectedEventForRegistrations.Id}
           eventTitle={selectedEventForRegistrations.Title}
+        />
+      )}
+
+      {manageWaitlistOpen && selectedEventForWaitlist && (
+        <ManageRegistrations
+          isOpen={manageWaitlistOpen}
+          onDismiss={closeManageWaitlist}
+          context={props.context}
+          eventId={selectedEventForWaitlist.Id}
+          eventTitle={selectedEventForWaitlist.Title}
+          viewType="waitlist"
         />
       )}
     </>

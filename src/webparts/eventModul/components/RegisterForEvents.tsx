@@ -48,12 +48,32 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [success, setSuccess] = useState<string | undefined>(undefined);
+  const [capacity, setCapacity] = useState<number>(0);
+  const [registrationCount, setRegistrationCount] = useState<number>(0);
 
   const loadEventFields = useCallback(async (): Promise<void> => {
     try {
       setIsLoading(true);
       setError(undefined);
       const sp = getSP(context);
+      
+      // Load event details for capacity
+      const event = await sp.web.lists
+        .getByTitle("EventDB")
+        .items.getById(eventId)
+        .select("Capacity")();
+      
+      setCapacity(event.Capacity || 0);
+      
+      // Load current registration count (only 'Registered' status)
+      const registrations = await sp.web.lists
+        .getByTitle("EventRegistrations")
+        .items.filter(`EventId eq ${eventId} and EventType eq 'Registered'`)
+        .select("Id")();
+      
+      setRegistrationCount(registrations.length);
+      
+      // Load custom fields
       const allItems = await sp.web.lists
         .getByTitle("EventFields")
         .items.select(
@@ -116,6 +136,11 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
       setError(undefined);
       const sp = getSP(context);
 
+      // Determine if user should be on waitlist
+      const available = capacity - registrationCount;
+      const isWaitlist = capacity > 0 && available <= 0;
+      const eventType = isWaitlist ? "Waitlist" : "Registered";
+
       // Generate a unique registration key
       const registrationKey = `${eventId}_${
         context.pageContext.user.loginName
@@ -135,6 +160,7 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
             FieldValue: String(value),
             RegistrationKey: registrationKey,
             Submitted: new Date().toISOString(),
+            EventType: eventType,
           };
 
           await sp.web.lists.getByTitle("EventRegistrations").items.add(itemData);
@@ -142,7 +168,10 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
       }
 
       setIsSaving(false);
-      setSuccess("Du er nu tilmeldt eventet!");
+      const successMessage = isWaitlist 
+        ? "Du er tilføjet til ventelisten!" 
+        : "Du er nu tilmeldt eventet!";
+      setSuccess(successMessage);
       setFieldValues({});
 
       // Close panel after 2 seconds
@@ -154,7 +183,7 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
       setIsSaving(false);
       setError("Kunne ikke gemme tilmeldingen. Prøv igen.");
     }
-  }, [validateForm, context, eventId, eventTitle, fields, fieldValues, onDismiss]);
+  }, [validateForm, context, eventId, eventTitle, fields, fieldValues, capacity, registrationCount, onDismiss]);
 
   const renderField = useCallback((field: IEventField): JSX.Element => {
     const value = fieldValues[field.Id] || "";

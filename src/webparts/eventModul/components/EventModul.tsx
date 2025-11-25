@@ -35,7 +35,6 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
   const [locationOptions, setLocationOptions] = useState<IDropdownOption[]>([]);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [registered, setRegistered] = useState(false);
-  const [cancelledEvents, setCancelledEvents] = useState(false);
   const [waitlisted, setWaitlisted] = useState(false);
   const [showAdminPage, setShowAdminPage] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -118,7 +117,6 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
     setEndDate(undefined);
     setSelectedLocation(undefined);
     setRegistered(false);
-    setCancelledEvents(false);
     setWaitlisted(false);
   }, []);
 
@@ -186,12 +184,24 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
         <Toggle
           label="Tilmeldt"
           checked={registered}
-          onChange={(_, checked) => setRegistered(!!checked)}
+          onChange={(_, checked) => {
+            setRegistered(!!checked);
+            if (checked) {
+              setWaitlisted(false);
+            }
+          }}
         />
 
-        <Toggle label="Afmeldt" checked={cancelledEvents} />
-
-        <Toggle label="Venteliste" checked={waitlisted} />
+        <Toggle 
+          label="Venteliste" 
+          checked={waitlisted} 
+          onChange={(_, checked) => {
+            setWaitlisted(!!checked);
+            if (checked) {
+              setRegistered(false);
+            }
+          }}
+        />
 
         <DefaultButton
           className={styles.restFilter}
@@ -205,14 +215,16 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
         />
       </section>
 
-      <h2>{registered ? "Mine events:" : "Fremtidige events:"}</h2>
-      {registered ? (
+      <h2>{registered || waitlisted ? "Mine events:" : "Fremtidige events:"}</h2>
+      {registered || waitlisted ? (
         <RegisteredListView
-          key={refreshTrigger}
+          key={`${refreshTrigger}-${waitlisted}`}
           context={context}
           startDate={startDate}
           endDate={endDate}
           selectedLocation={selectedLocation}
+          registered={registered}
+          waitlisted={waitlisted}
         />
       ) : (
         <ListView
