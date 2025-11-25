@@ -43,7 +43,9 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
 
   // State
   const [fields, setFields] = useState<IEventField[]>([]);
-  const [fieldValues, setFieldValues] = useState<{ [key: number]: string | boolean }>({});
+  const [fieldValues, setFieldValues] = useState<{
+    [key: number]: string | boolean;
+  }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -56,23 +58,23 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
       setIsLoading(true);
       setError(undefined);
       const sp = getSP(context);
-      
+
       // Load event details for capacity
       const event = await sp.web.lists
         .getByTitle("EventDB")
         .items.getById(eventId)
         .select("Capacity")();
-      
+
       setCapacity(event.Capacity || 0);
-      
+
       // Load current registration count (only 'Registered' status)
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
         .items.filter(`EventId eq ${eventId} and EventType eq 'Registered'`)
         .select("Id")();
-      
+
       setRegistrationCount(registrations.length);
-      
+
       // Load custom fields
       const allItems = await sp.web.lists
         .getByTitle("EventFields")
@@ -105,12 +107,15 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
     }
   }, [isOpen, loadEventFields]);
 
-  const onFieldChange = useCallback((fieldId: number, value: string | boolean): void => {
-    setFieldValues((prev) => ({
-      ...prev,
-      [fieldId]: value,
-    }));
-  }, []);
+  const onFieldChange = useCallback(
+    (fieldId: number, value: string | boolean): void => {
+      setFieldValues((prev) => ({
+        ...prev,
+        [fieldId]: value,
+      }));
+    },
+    []
+  );
 
   const validateForm = useCallback((): boolean => {
     for (const field of fields) {
@@ -153,8 +158,8 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
         if (value !== undefined) {
           const itemData = {
             Title: eventTitle,
-            EventId: eventId, 
-            BrugerId: currentUser.Id, 
+            EventId: eventId,
+            BrugerId: currentUser.Id,
             FieldName: field.Title,
             FieldType: field.FeltType,
             FieldValue: String(value),
@@ -163,13 +168,15 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
             EventType: eventType,
           };
 
-          await sp.web.lists.getByTitle("EventRegistrations").items.add(itemData);
+          await sp.web.lists
+            .getByTitle("EventRegistrations")
+            .items.add(itemData);
         }
       }
 
       setIsSaving(false);
-      const successMessage = isWaitlist 
-        ? "Du er tilføjet til ventelisten!" 
+      const successMessage = isWaitlist
+        ? "Du er tilføjet til ventelisten!"
         : "Du er nu tilmeldt eventet!";
       setSuccess(successMessage);
       setFieldValues({});
@@ -183,85 +190,103 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
       setIsSaving(false);
       setError("Kunne ikke gemme tilmeldingen. Prøv igen.");
     }
-  }, [validateForm, context, eventId, eventTitle, fields, fieldValues, capacity, registrationCount, onDismiss]);
+  }, [
+    validateForm,
+    context,
+    eventId,
+    eventTitle,
+    fields,
+    fieldValues,
+    capacity,
+    registrationCount,
+    onDismiss,
+  ]);
 
-  const renderField = useCallback((field: IEventField): JSX.Element => {
-    const value = fieldValues[field.Id] || "";
+  const renderField = useCallback(
+    (field: IEventField): JSX.Element => {
+      const value = fieldValues[field.Id] || "";
 
-    switch (field.FeltType) {
-      case "text":
-      case "Text":
-      case "Tekst":
-        return (
-          <TextField
-            label={field.Title}
-            required={field.P_x00e5_kr_x00e6_vet}
-            value={value as string}
-            onChange={(_, newValue) =>
-              onFieldChange(field.Id, newValue || "")
+      switch (field.FeltType) {
+        case "text":
+        case "Text":
+        case "Tekst":
+          return (
+            <TextField
+              label={field.Title}
+              required={field.P_x00e5_kr_x00e6_vet}
+              value={value as string}
+              onChange={(_, newValue) =>
+                onFieldChange(field.Id, newValue || "")
+              }
+            />
+          );
+
+        case "multipleChoice":
+        case "Dropdown":
+        case "Valgmenu": {
+          // Parse the JSON string to get the options array
+          let options: IDropdownOption[] = [];
+          if (field.Valgmuligheder) {
+            try {
+              // Try to parse as JSON first (new format)
+              const optionsArray = JSON.parse(field.Valgmuligheder);
+              options = optionsArray.map((opt: string) => ({
+                key: opt,
+                text: opt,
+              }));
+            } catch {
+              // Fallback to comma-separated (old format)
+              options = field.Valgmuligheder.split(",").map((opt) => ({
+                key: opt.trim(),
+                text: opt.trim(),
+              }));
             }
-          />
-        );
-
-      case "multipleChoice":
-      case "Dropdown":
-      case "Valgmenu": {
-        // Parse the JSON string to get the options array
-        let options: IDropdownOption[] = [];
-        if (field.Valgmuligheder) {
-          try {
-            // Try to parse as JSON first (new format)
-            const optionsArray = JSON.parse(field.Valgmuligheder);
-            options = optionsArray.map((opt: string) => ({
-              key: opt,
-              text: opt,
-            }));
-          } catch {
-            // Fallback to comma-separated (old format)
-            options = field.Valgmuligheder.split(",").map((opt) => ({
-              key: opt.trim(),
-              text: opt.trim(),
-            }));
           }
+          return (
+            <Dropdown
+              label={field.Title}
+              required={field.P_x00e5_kr_x00e6_vet}
+              options={options}
+              selectedKey={value as string}
+              onChange={(_, option) =>
+                onFieldChange(field.Id, (option?.key as string) || "")
+              }
+              placeholder="Vælg en mulighed"
+            />
+          );
         }
-        return (
-          <Dropdown
-            label={field.Title}
-            required={field.P_x00e5_kr_x00e6_vet}
-            options={options}
-            selectedKey={value as string}
-            onChange={(_, option) =>
-              onFieldChange(field.Id, (option?.key as string) || "")
-            }
-            placeholder="Vælg en mulighed"
-          />
-        );
+
+        case "Checkbox":
+        case "Afkrydsningsfelt":
+          return (
+            <Checkbox
+              label={field.Title}
+              checked={value as boolean}
+              onChange={(_, checked) => onFieldChange(field.Id, !!checked)}
+            />
+          );
+
+        default:
+          console.warn(
+            "Unknown field type:",
+            field.FeltType,
+            "for field:",
+            field.Title
+          );
+          return (
+            <TextField
+              label={field.Title}
+              required={field.P_x00e5_kr_x00e6_vet}
+              value={value as string}
+              onChange={(_, newValue) =>
+                onFieldChange(field.Id, newValue || "")
+              }
+            />
+          );
       }
-
-      case "Checkbox":
-      case "Afkrydsningsfelt":
-        return (
-          <Checkbox
-            label={field.Title}
-            checked={value as boolean}
-            onChange={(_, checked) => onFieldChange(field.Id, !!checked)}
-          />
-        );
-
-      default:
-        console.warn("Unknown field type:", field.FeltType, "for field:", field.Title);
-        return (
-          <TextField
-            label={field.Title}
-            required={field.P_x00e5_kr_x00e6_vet}
-            value={value as string}
-            onChange={(_, newValue) =>
-              onFieldChange(field.Id, newValue || "")
-            }
-          />
-        );
-    }
-  }, [fieldValues, onFieldChange]);
+    },
+    [fieldValues, onFieldChange]
+  );
 
   return (
     <Panel

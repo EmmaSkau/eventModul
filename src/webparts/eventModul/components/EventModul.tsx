@@ -31,7 +31,9 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
   // State
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
-  const [selectedLocation, setSelectedLocation] = useState<string | undefined>(undefined);
+  const [selectedLocation, setSelectedLocation] = useState<string | undefined>(
+    undefined
+  );
   const [locationOptions, setLocationOptions] = useState<IDropdownOption[]>([]);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -95,18 +97,24 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
     });
   }, [loadLocationsFromSharePoint]);
 
-  const onLocationChange = useCallback((
-    event: React.FormEvent<HTMLDivElement>,
-    option?: IDropdownOption
-  ): void => {
-    if (option) {
-      setSelectedLocation(option.key as string);
-    }
-  }, []);
+  const onLocationChange = useCallback(
+    (
+      event: React.FormEvent<HTMLDivElement>,
+      option?: IDropdownOption
+    ): void => {
+      if (option) {
+        setSelectedLocation(option.key as string);
+      }
+    },
+    []
+  );
 
-  const onStartDateSelect = useCallback((date: Date | null | undefined): void => {
-    setStartDate(date || undefined);
-  }, []);
+  const onStartDateSelect = useCallback(
+    (date: Date | null | undefined): void => {
+      setStartDate(date || undefined);
+    },
+    []
+  );
 
   const onEndDateSelect = useCallback((date: Date | null | undefined): void => {
     setEndDate(date || undefined);
@@ -121,7 +129,7 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
   }, []);
 
   const handleRefresh = useCallback((): void => {
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   const handleOpenAdminPage = useCallback((): void => {
@@ -134,13 +142,9 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
 
   return (
     <section
-      className={`${styles.eventModul} ${
-        hasTeamsContext ? styles.teams : ""
-      }`}
+      className={`${styles.eventModul} ${hasTeamsContext ? styles.teams : ""}`}
     >
-      {showAdminPage && (
-        <AdminPage {...props} onClose={handleCloseAdminPage} />
-      )}
+      {showAdminPage && <AdminPage {...props} onClose={handleCloseAdminPage} />}
 
       <div className={styles.welcome}>
         <h2>{escape(userDisplayName)}s Events</h2>
@@ -192,9 +196,9 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
           }}
         />
 
-        <Toggle 
-          label="Venteliste" 
-          checked={waitlisted} 
+        <Toggle
+          label="Venteliste"
+          checked={waitlisted}
           onChange={(_, checked) => {
             setWaitlisted(!!checked);
             if (checked) {
@@ -215,7 +219,9 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
         />
       </section>
 
-      <h2>{registered || waitlisted ? "Mine events:" : "Fremtidige events:"}</h2>
+      <h2>
+        {registered || waitlisted ? "Mine events:" : "Fremtidige events:"}
+      </h2>
       {registered || waitlisted ? (
         <RegisteredListView
           key={`${refreshTrigger}-${waitlisted}`}

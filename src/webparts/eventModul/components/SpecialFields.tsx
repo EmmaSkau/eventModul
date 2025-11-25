@@ -21,35 +21,49 @@ interface IAddFieldDialogProps {
   onCancel: () => void;
 }
 
-const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({ onAddField, onCancel }) => {
+const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({
+  onAddField,
+  onCancel,
+}) => {
   // State
   const [newFieldName, setNewFieldName] = useState("");
-  const [newFieldType, setNewFieldType] = useState<"text" | "multipleChoice">("text");
+  const [newFieldType, setNewFieldType] = useState<"text" | "multipleChoice">(
+    "text"
+  );
   const [newFieldOptions, setNewFieldOptions] = useState("");
 
   // Event handlers
-  const onFieldNameChange = useCallback((
-    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
-    newValue?: string
-  ): void => {
-    setNewFieldName(newValue || "");
-  }, []);
+  const onFieldNameChange = useCallback(
+    (
+      event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+      newValue?: string
+    ): void => {
+      setNewFieldName(newValue || "");
+    },
+    []
+  );
 
-  const onFieldTypeChange = useCallback((
-    event: React.FormEvent<HTMLDivElement>,
-    option?: IDropdownOption
-  ): void => {
-    if (option) {
-      setNewFieldType(option.key as "text" | "multipleChoice");
-    }
-  }, []);
+  const onFieldTypeChange = useCallback(
+    (
+      event: React.FormEvent<HTMLDivElement>,
+      option?: IDropdownOption
+    ): void => {
+      if (option) {
+        setNewFieldType(option.key as "text" | "multipleChoice");
+      }
+    },
+    []
+  );
 
-  const onFieldOptionsChange = useCallback((
-    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
-    newValue?: string
-  ): void => {
-    setNewFieldOptions(newValue || "");
-  }, []);
+  const onFieldOptionsChange = useCallback(
+    (
+      event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+      newValue?: string
+    ): void => {
+      setNewFieldOptions(newValue || "");
+    },
+    []
+  );
 
   const handleAddField = useCallback((): void => {
     // Validation
@@ -70,7 +84,10 @@ const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({ onAddField, onCancel }
       fieldType: newFieldType,
       options:
         newFieldType === "multipleChoice"
-          ? newFieldOptions.split(",").map((opt) => opt.trim()).filter((opt) => opt)
+          ? newFieldOptions
+              .split(",")
+              .map((opt) => opt.trim())
+              .filter((opt) => opt)
           : undefined,
     };
 
@@ -99,7 +116,10 @@ const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({ onAddField, onCancel }
   ];
 
   return (
-    <Stack tokens={{ childrenGap: 15 }} styles={{ root: { padding: '10px 0' } }}>
+    <Stack
+      tokens={{ childrenGap: 15 }}
+      styles={{ root: { padding: "10px 0" } }}
+    >
       <TextField
         label="Feltnavn"
         placeholder="fx T-shirt størrelse"

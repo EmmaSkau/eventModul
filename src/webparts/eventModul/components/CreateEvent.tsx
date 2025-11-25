@@ -38,8 +38,12 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   const [title, setTitle] = useState<string>("");
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
-  const [selectedLocation, setSelectedLocation] = useState<string | undefined>(undefined);
-  const [maxParticipants, setMaxParticipants] = useState<number | undefined>(undefined);
+  const [selectedLocation, setSelectedLocation] = useState<string | undefined>(
+    undefined
+  );
+  const [maxParticipants, setMaxParticipants] = useState<number | undefined>(
+    undefined
+  );
   const [customFields, setCustomFields] = useState<ICustomField[]>([]);
   const [showFieldDialog, setShowFieldDialog] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
@@ -48,19 +52,28 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   // Loading states
   const [isSaving, setIsSaving] = useState(false);
 
-  const loadCustomFields = useCallback(async (eventId: number): Promise<void> => {
-    try {
-      const sp = getSP(context);
-      const fields = await sp.web.lists
-        .getByTitle("EventFields")
-        .items.filter(`EventId eq ${eventId}`)
-        .select("Id", "Title", "FeltType", "Valgmuligheder", "P_x00e5_kr_x00e6_vet")();
-      
-      setCustomFields(fields);
-    } catch (error) {
-      console.error("Error loading custom fields:", error);
-    }
-  }, [context]);
+  const loadCustomFields = useCallback(
+    async (eventId: number): Promise<void> => {
+      try {
+        const sp = getSP(context);
+        const fields = await sp.web.lists
+          .getByTitle("EventFields")
+          .items.filter(`EventId eq ${eventId}`)
+          .select(
+            "Id",
+            "Title",
+            "FeltType",
+            "Valgmuligheder",
+            "P_x00e5_kr_x00e6_vet"
+          )();
+
+        setCustomFields(fields);
+      } catch (error) {
+        console.error("Error loading custom fields:", error);
+      }
+    },
+    [context]
+  );
 
   // Load custom fields when editing an event
   useEffect(() => {
@@ -76,7 +89,9 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
     if (eventToEdit) {
       setTitle(eventToEdit.Title);
       setStartDate(eventToEdit.Dato ? new Date(eventToEdit.Dato) : undefined);
-      setEndDate(eventToEdit.SlutDato ? new Date(eventToEdit.SlutDato) : undefined);
+      setEndDate(
+        eventToEdit.SlutDato ? new Date(eventToEdit.SlutDato) : undefined
+      );
       setSelectedLocation(eventToEdit.Placering);
       setMaxParticipants(eventToEdit.Capacity);
       setIsOnline(eventToEdit.Placering === "Online");
@@ -95,22 +110,28 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   }, [eventToEdit]);
 
   // ONLINE CHECKBOX START
-  const onOnlineCheckboxChange = useCallback((
-    event?: React.FormEvent<HTMLElement | HTMLInputElement>,
-    checked?: boolean
-  ): void => {
-    setIsOnline(!!checked);
-    if (!checked) {
-      setOnlineLink("");
-    }
-  }, []);
+  const onOnlineCheckboxChange = useCallback(
+    (
+      event?: React.FormEvent<HTMLElement | HTMLInputElement>,
+      checked?: boolean
+    ): void => {
+      setIsOnline(!!checked);
+      if (!checked) {
+        setOnlineLink("");
+      }
+    },
+    []
+  );
 
-  const onOnlineLinkChange = useCallback((
-    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
-    newValue?: string
-  ): void => {
-    setOnlineLink(newValue || "");
-  }, []);
+  const onOnlineLinkChange = useCallback(
+    (
+      event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+      newValue?: string
+    ): void => {
+      setOnlineLink(newValue || "");
+    },
+    []
+  );
 
   // ADD CUSTOM FIELDS START
   const openAddFieldDialog = useCallback((): void => {
@@ -131,27 +152,36 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   }, []);
 
   // FORM FIELD HANDLERS
-  const onTitleChange = useCallback((
-    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
-    newValue?: string
-  ): void => {
-    setTitle(newValue || "");
-  }, []);
+  const onTitleChange = useCallback(
+    (
+      event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+      newValue?: string
+    ): void => {
+      setTitle(newValue || "");
+    },
+    []
+  );
 
-  const onStartDateChange = useCallback((date: Date | null | undefined): void => {
-    setStartDate(date || undefined);
-  }, []);
+  const onStartDateChange = useCallback(
+    (date: Date | null | undefined): void => {
+      setStartDate(date || undefined);
+    },
+    []
+  );
 
   const onEndDateChange = useCallback((date: Date | null | undefined): void => {
     setEndDate(date || undefined);
   }, []);
 
-  const onLocationChange = useCallback((
-    event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
-    newValue?: string
-  ): void => {
-    setSelectedLocation(newValue);
-  }, []);
+  const onLocationChange = useCallback(
+    (
+      event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>,
+      newValue?: string
+    ): void => {
+      setSelectedLocation(newValue);
+    },
+    []
+  );
 
   // SAVE EVENT
   const saveEvent = useCallback(async (): Promise<void> => {
@@ -189,12 +219,12 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
         Dato: startDate.toISOString(),
         SlutDato: endDate.toISOString(),
         AdministratorId: currentUser.Id,
-        Placering: isOnline ? "Online" : selectedLocation || "", 
+        Placering: isOnline ? "Online" : selectedLocation || "",
         Capacity: maxParticipants
           ? parseInt(String(maxParticipants), 10)
           : null,
         Online:
-          isOnline && onlineLink 
+          isOnline && onlineLink
             ? {
                 Description: "Online Link",
                 Url: onlineLink,
@@ -268,7 +298,20 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       );
       setIsSaving(false);
     }
-  }, [title, startDate, endDate, context, isOnline, selectedLocation, maxParticipants, onlineLink, eventToEdit, customFields, onEventCreated, onClose]);
+  }, [
+    title,
+    startDate,
+    endDate,
+    context,
+    isOnline,
+    selectedLocation,
+    maxParticipants,
+    onlineLink,
+    eventToEdit,
+    customFields,
+    onEventCreated,
+    onClose,
+  ]);
 
   return (
     <Panel
@@ -348,11 +391,7 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
           <Stack tokens={{ childrenGap: 10 }}>
             <Label>Brugerdefinerede felter:</Label>
             {customFields.map((field) => (
-              <Stack
-                key={field.id}
-                horizontal
-                horizontalAlign="space-between"
-              >
+              <Stack key={field.id} horizontal horizontalAlign="space-between">
                 <Text>
                   {field.fieldName} ({field.fieldType})
                 </Text>

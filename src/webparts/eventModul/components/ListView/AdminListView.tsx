@@ -40,8 +40,9 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
   const [selectedEventForRegistrations, setSelectedEventForRegistrations] =
     useState<IEventItem | undefined>();
   const [manageWaitlistOpen, setManageWaitlistOpen] = useState(false);
-  const [selectedEventForWaitlist, setSelectedEventForWaitlist] =
-    useState<IEventItem | undefined>();
+  const [selectedEventForWaitlist, setSelectedEventForWaitlist] = useState<
+    IEventItem | undefined
+  >();
 
   // Load registration counts
   const loadRegistrationCounts = useCallback(async (): Promise<void> => {
@@ -68,7 +69,7 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     }
   }, [props.context]);
 
-  // Filter events 
+  // Filter events
   const filterEvents = useCallback(
     (items: IEventItem[]): IEventItem[] => {
       let filtered = [...items];
@@ -149,7 +150,7 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
   useEffect(() => {
     loadRegistrationCounts().catch(console.error);
     loadEvents().catch(console.error);
-  }, []); 
+  }, []);
 
   // Reload when filters change
   useEffect(() => {
@@ -291,7 +292,7 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           const displayText =
             capacity > 0 ? `${count}/${capacity}` : count.toString();
           return (
-            <div style={{ display: "flex", alignItems: "center"}}>
+            <div style={{ display: "flex", alignItems: "center" }}>
               <span>{displayText}</span>
               <ActionButton
                 iconProps={{ iconName: "Edit" }}
@@ -313,7 +314,10 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         onRender: (item: IEventItem) => {
           return (
             <div style={{ display: "flex", gap: "8px" }}>
-              <DefaultButton text="venteliste" onClick={() => openManageWaitlist(item)} />
+              <DefaultButton
+                text="venteliste"
+                onClick={() => openManageWaitlist(item)}
+              />
               <DefaultButton text="Ret" onClick={() => handleEditEvent(item)} />
               <PrimaryButton
                 text="Slet"

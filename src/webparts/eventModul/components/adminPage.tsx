@@ -26,12 +26,12 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
   }, []);
 
   const handleEventCreated = useCallback((): void => {
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
 
     const refreshTimes = [2000, 4000, 6000]; // Refresh at 2s, 4s, and 6s
     refreshTimes.forEach((delay) => {
       setTimeout(() => {
-        setRefreshTrigger(prev => prev + 1);
+        setRefreshTrigger((prev) => prev + 1);
       }, delay);
     });
   }, []);
@@ -50,17 +50,12 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
 
   return (
     <section
-      className={`${styles.eventModul} ${
-        hasTeamsContext ? styles.teams : ""
-      }`}
+      className={`${styles.eventModul} ${hasTeamsContext ? styles.teams : ""}`}
     >
       <div className={styles.welcome}>
         <h2>{escape(userDisplayName)}s Events</h2>
         <p>Her kan du se alle dine events og oprette ny events</p>
-        <PrimaryButton
-          text="Luk Admin page"
-          onClick={handleCloseAdminPage}
-        />
+        <PrimaryButton text="Luk Admin page" onClick={handleCloseAdminPage} />
       </div>
 
       <PrimaryButton text="Opret ny event" onClick={handleCreateEvent} />

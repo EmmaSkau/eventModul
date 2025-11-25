@@ -27,40 +27,43 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
   const [error, setError] = useState<string | undefined>();
 
   // Filter events
-  const filterEvents = useCallback((items: IEventItem[]): IEventItem[] => {
-    let filtered = [...items];
+  const filterEvents = useCallback(
+    (items: IEventItem[]): IEventItem[] => {
+      let filtered = [...items];
 
-    if (props.startDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate >= props.startDate!;
-      });
-    }
+      if (props.startDate) {
+        filtered = filtered.filter((item) => {
+          if (!item.Dato) return false;
+          const eventDate = new Date(item.Dato);
+          return eventDate >= props.startDate!;
+        });
+      }
 
-    if (props.endDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate <= props.endDate!;
-      });
-    }
+      if (props.endDate) {
+        filtered = filtered.filter((item) => {
+          if (!item.Dato) return false;
+          const eventDate = new Date(item.Dato);
+          return eventDate <= props.endDate!;
+        });
+      }
 
-    if (props.selectedLocation && props.selectedLocation !== "all") {
-      filtered = filtered.filter((item) => {
-        if (!item.Placering) return false;
-        try {
-          const parsed = JSON.parse(item.Placering);
-          return parsed.DisplayName === props.selectedLocation;
-        } catch {
-          return item.Placering === props.selectedLocation;
-        }
-      });
-    }
+      if (props.selectedLocation && props.selectedLocation !== "all") {
+        filtered = filtered.filter((item) => {
+          if (!item.Placering) return false;
+          try {
+            const parsed = JSON.parse(item.Placering);
+            return parsed.DisplayName === props.selectedLocation;
+          } catch {
+            return item.Placering === props.selectedLocation;
+          }
+        });
+      }
 
-    filtered = getFutureEventsSorted(filtered);
-    return filtered;
-  }, [props.startDate, props.endDate, props.selectedLocation]);
+      filtered = getFutureEventsSorted(filtered);
+      return filtered;
+    },
+    [props.startDate, props.endDate, props.selectedLocation]
+  );
 
   // Load events
   const loadEvents = useCallback(async (): Promise<void> => {
@@ -142,7 +145,9 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
 
   // Handle unregister from event
   const handleDeleteEvent = async (item: IEventItem): Promise<void> => {
-    if (!confirm(`Er du sikker på, at du vil afmeldes "${item.Title}" event?`)) {
+    if (
+      !confirm(`Er du sikker på, at du vil afmeldes "${item.Title}" event?`)
+    ) {
       return;
     }
 
@@ -151,7 +156,9 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
       const currentUser = await sp.web.currentUser();
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`Title eq '${currentUser.Title}' and EventId eq ${item.Id}`)
+        .items.filter(
+          `Title eq '${currentUser.Title}' and EventId eq ${item.Id}`
+        )
         .select("Id")();
 
       if (registrations.length === 0) {

@@ -28,73 +28,78 @@ const ListView: React.FC<IListViewProps> = (props) => {
   const [error, setError] = useState<string | undefined>();
   const [registerPanelOpen, setRegisterPanelOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>();
-  const [selectedEventTitle, setSelectedEventTitle] = useState<string | undefined>();
+  const [selectedEventTitle, setSelectedEventTitle] = useState<
+    string | undefined
+  >();
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
   const [registrationCounts, setRegistrationCounts] = useState<{
-      [eventId: number]: number;
-    }>({});
+    [eventId: number]: number;
+  }>({});
 
-    // Load registration counts
-      const loadRegistrationCounts = useCallback(async (): Promise<void> => {
-        try {
-          const sp = getSP(props.context);
-    
-          // Get all registrations
-          const registrations = await sp.web.lists
-            .getByTitle("EventRegistrations")
-            .items.select("EventId", "EventType")();
-    
-          // Count registrations per event
-          const counts: { [eventId: number]: number } = {};
-    
-          registrations.forEach((reg) => {
-            // Count if EventType is not explicitly 'Waitlist'
-            if (reg.EventId && reg.EventType !== 'Waitlist') {
-              counts[reg.EventId] = (counts[reg.EventId] || 0) + 1;
-            }
-          });
-    
-          setRegistrationCounts(counts);
-        } catch (error) {
-          console.error("Error loading registration counts:", error);
+  // Load registration counts
+  const loadRegistrationCounts = useCallback(async (): Promise<void> => {
+    try {
+      const sp = getSP(props.context);
+
+      // Get all registrations
+      const registrations = await sp.web.lists
+        .getByTitle("EventRegistrations")
+        .items.select("EventId", "EventType")();
+
+      // Count registrations per event
+      const counts: { [eventId: number]: number } = {};
+
+      registrations.forEach((reg) => {
+        // Count if EventType is not explicitly 'Waitlist'
+        if (reg.EventId && reg.EventType !== "Waitlist") {
+          counts[reg.EventId] = (counts[reg.EventId] || 0) + 1;
         }
-      }, [props.context]);
+      });
+
+      setRegistrationCounts(counts);
+    } catch (error) {
+      console.error("Error loading registration counts:", error);
+    }
+  }, [props.context]);
 
   // Filter events based on props
-  const filterEvents = useCallback((items: IEventItem[]): IEventItem[] => {
-    let filtered = [...items];
+  const filterEvents = useCallback(
+    (items: IEventItem[]): IEventItem[] => {
+      let filtered = [...items];
 
-    if (props.startDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate >= props.startDate!;
-      });
-    }
+      if (props.startDate) {
+        filtered = filtered.filter((item) => {
+          if (!item.Dato) return false;
+          const eventDate = new Date(item.Dato);
+          return eventDate >= props.startDate!;
+        });
+      }
 
-    if (props.endDate) {
-      filtered = filtered.filter((item) => {
-        if (!item.Dato) return false;
-        const eventDate = new Date(item.Dato);
-        return eventDate <= props.endDate!;
-      });
-    }
+      if (props.endDate) {
+        filtered = filtered.filter((item) => {
+          if (!item.Dato) return false;
+          const eventDate = new Date(item.Dato);
+          return eventDate <= props.endDate!;
+        });
+      }
 
-    if (props.selectedLocation && props.selectedLocation !== "all") {
-      filtered = filtered.filter((item) => {
-        if (!item.Placering) return false;
-        try {
-          const parsed = JSON.parse(item.Placering);
-          return parsed.DisplayName === props.selectedLocation;
-        } catch {
-          return item.Placering === props.selectedLocation;
-        }
-      });
-    }
+      if (props.selectedLocation && props.selectedLocation !== "all") {
+        filtered = filtered.filter((item) => {
+          if (!item.Placering) return false;
+          try {
+            const parsed = JSON.parse(item.Placering);
+            return parsed.DisplayName === props.selectedLocation;
+          } catch {
+            return item.Placering === props.selectedLocation;
+          }
+        });
+      }
 
-    filtered = getFutureEventsSorted(filtered);
-    return filtered;
-  }, [props.startDate, props.endDate, props.selectedLocation]);
+      filtered = getFutureEventsSorted(filtered);
+      return filtered;
+    },
+    [props.startDate, props.endDate, props.selectedLocation]
+  );
 
   // Load events
   const loadEvents = useCallback(async (): Promise<void> => {
@@ -162,54 +167,66 @@ const ListView: React.FC<IListViewProps> = (props) => {
   }, [loadEvents]);
 
   // Check if event has custom fields
-  const checkIfEventHasCustomFields = useCallback(async (eventId: number): Promise<boolean> => {
-    try {
-      const sp = getSP(props.context);
-      const fields = await sp.web.lists
-        .getByTitle("EventFields")
-        .items.filter(`EventId eq ${eventId}`)
-        .select("Id")();
+  const checkIfEventHasCustomFields = useCallback(
+    async (eventId: number): Promise<boolean> => {
+      try {
+        const sp = getSP(props.context);
+        const fields = await sp.web.lists
+          .getByTitle("EventFields")
+          .items.filter(`EventId eq ${eventId}`)
+          .select("Id")();
 
-      return fields.length > 0;
-    } catch (error) {
-      console.error("Error checking custom fields:", error);
-      return false;
-    }
-  }, [props.context]);
+        return fields.length > 0;
+      } catch (error) {
+        console.error("Error checking custom fields:", error);
+        return false;
+      }
+    },
+    [props.context]
+  );
 
   // Register user to event
-  const registerUserToEvent = useCallback(async (eventId: number, isWaitlist: boolean = false): Promise<void> => {
-    try {
-      const sp = getSP(props.context);
-      const currentUser = await sp.web.currentUser();
+  const registerUserToEvent = useCallback(
+    async (eventId: number, isWaitlist: boolean = false): Promise<void> => {
+      try {
+        const sp = getSP(props.context);
+        const currentUser = await sp.web.currentUser();
 
-      const registrationKey = `${eventId}_${props.context.pageContext.user.loginName}_${new Date().getTime()}`;
+        const registrationKey = `${eventId}_${
+          props.context.pageContext.user.loginName
+        }_${new Date().getTime()}`;
 
-      await sp.web.lists.getByTitle("EventRegistrations").items.add({
-        Title: currentUser.Title,
-        EventId: eventId,
-        BrugerId: currentUser.Id,
-        RegistrationKey: registrationKey,
-        Submitted: new Date().toISOString(),
-        EventType: isWaitlist ? "Waitlist" : "Registered",
-      });
+        await sp.web.lists.getByTitle("EventRegistrations").items.add({
+          Title: currentUser.Title,
+          EventId: eventId,
+          BrugerId: currentUser.Id,
+          RegistrationKey: registrationKey,
+          Submitted: new Date().toISOString(),
+          EventType: isWaitlist ? "Waitlist" : "Registered",
+        });
 
-      if (isWaitlist) {
-        alert("Du er tilføjet til ventelisten!");
-      } else {
-        alert("Du er nu tilmeldt eventet!");
+        if (isWaitlist) {
+          alert("Du er tilføjet til ventelisten!");
+        } else {
+          alert("Du er nu tilmeldt eventet!");
+        }
+
+        await loadUserRegistrations();
+        await loadEvents();
+        await loadRegistrationCounts();
+      } catch (error) {
+        console.error("Error registering for event:", error);
+        alert("Fejl ved tilmelding. Prøv igen.");
       }
+    },
+    [props.context, loadUserRegistrations, loadEvents, loadRegistrationCounts]
+  );
 
-      await loadUserRegistrations();
-      await loadEvents();
-      await loadRegistrationCounts();
-    } catch (error) {
-      console.error("Error registering for event:", error);
-      alert("Fejl ved tilmelding. Prøv igen.");
-    }
-  }, [props.context, loadUserRegistrations, loadEvents, loadRegistrationCounts]);
-
-  const handleRegister = async (eventId: number, eventTitle: string, isWaitlist: boolean = false): Promise<void> => {
+  const handleRegister = async (
+    eventId: number,
+    eventTitle: string,
+    isWaitlist: boolean = false
+  ): Promise<void> => {
     const hasCustomFields = await checkIfEventHasCustomFields(eventId);
 
     if (hasCustomFields) {
@@ -217,10 +234,10 @@ const ListView: React.FC<IListViewProps> = (props) => {
       setSelectedEventId(eventId);
       setSelectedEventTitle(eventTitle);
     } else {
-      const message = isWaitlist 
+      const message = isWaitlist
         ? `Eventet er fuldt booket. Vil du tilføjes til ventelisten for "${eventTitle}"?`
         : `Vil du tilmelde dig til "${eventTitle}"?`;
-      
+
       if (confirm(message)) {
         await registerUserToEvent(eventId, isWaitlist);
       }
@@ -333,7 +350,9 @@ const ListView: React.FC<IListViewProps> = (props) => {
 
           return (
             <PrimaryButton
-              text={isRegistered ? "Tilmeldt" : isFull ? "Venteliste" : "Tilmeld"}
+              text={
+                isRegistered ? "Tilmeldt" : isFull ? "Venteliste" : "Tilmeld"
+              }
               onClick={() => handleRegister(item.Id, item.Title, isFull)}
               disabled={isRegistered}
             />
