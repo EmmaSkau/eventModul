@@ -8,6 +8,7 @@ export interface IEventItem {
   };
   Placering?: string;
   targetGroup?: string;
+  M_x00e5_lgruppeId?: number[];
   Beskrivelse?: string;
   TilfoejEkstraInfo?: string;
   Capacity?: number;

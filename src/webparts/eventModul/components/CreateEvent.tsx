@@ -18,6 +18,9 @@ import {
   IconButton,
   Text,
   Checkbox,
+  SearchBox,
+  Spinner,
+  SpinnerSize,
 } from "@fluentui/react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { IEventItem } from "../components/Utility/IEventItem";
@@ -38,6 +41,14 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   const [title, setTitle] = useState<string>("");
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [selectedUsers, setSelectedUsers] = useState<
+    Array<{ Id: number; Title: string; Email: string }>
+  >([]);
+  const [userSearchText, setUserSearchText] = useState<string>("");
+  const [userSearchResults, setUserSearchResults] = useState<
+    Array<{ Id: number; Title: string; Email: string }>
+  >([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<string | undefined>(
     undefined
   );
@@ -51,6 +62,66 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
 
   // Loading states
   const [isSaving, setIsSaving] = useState(false);
+
+  // Search for users
+  const searchUsers = useCallback(
+    async (searchText: string): Promise<void> => {
+      if (!searchText || searchText.length < 2) {
+        setUserSearchResults([]);
+        return;
+      }
+
+      try {
+        setIsSearchingUsers(true);
+        const sp = getSP(context);
+
+        const users = await sp.web.siteUsers
+          .filter(`substringof('${searchText}', Title)`)
+          .top(10)();
+
+        const results = users.map((user) => ({
+          Id: user.Id,
+          Title: user.Title,
+          Email: user.Email || "",
+        }));
+
+        setUserSearchResults(results);
+        setIsSearchingUsers(false);
+      } catch (error) {
+        console.error("Error searching users:", error);
+        setIsSearchingUsers(false);
+      }
+    },
+    [context]
+  );
+
+  const handleUserSearchChange = useCallback(
+    (newValue: string | undefined): void => {
+      const value = newValue || "";
+      setUserSearchText(value);
+      searchUsers(value).catch(console.error);
+    },
+    [searchUsers]
+  );
+
+  const addUserToTargetGroup = useCallback(
+    (user: { Id: number; Title: string; Email: string }): void => {
+      setSelectedUsers((prev) => {
+        // Check if user is already added
+        if (prev.some((u) => u.Id === user.Id)) {
+          return prev;
+        }
+        return [...prev, user];
+      });
+      setUserSearchText("");
+      setUserSearchResults([]);
+    },
+    []
+  );
+
+  const removeUserFromTargetGroup = useCallback((userId: number): void => {
+    setSelectedUsers((prev) => prev.filter((u) => u.Id !== userId));
+  }, []);
 
   const loadCustomFields = useCallback(
     async (eventId: number): Promise<void> => {
@@ -96,6 +167,34 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       setMaxParticipants(eventToEdit.Capacity);
       setIsOnline(eventToEdit.Placering === "Online");
       setOnlineLink(eventToEdit.Online?.Url || "");
+
+      // Load target group users if available
+      if (
+        eventToEdit.M_x00e5_lgruppeId &&
+        eventToEdit.M_x00e5_lgruppeId.length > 0
+      ) {
+        const loadTargetGroupUsers = async (): Promise<void> => {
+          try {
+            const sp = getSP(context);
+            const users = await Promise.all(
+              eventToEdit.M_x00e5_lgruppeId!.map(async (userId: number) => {
+                const user = await sp.web.siteUsers.getById(userId)();
+                return {
+                  Id: user.Id,
+                  Title: user.Title,
+                  Email: user.Email || "",
+                };
+              })
+            );
+            setSelectedUsers(users);
+          } catch (error) {
+            console.error("Error loading target group users:", error);
+          }
+        };
+        loadTargetGroupUsers().catch(console.error);
+      } else {
+        setSelectedUsers([]);
+      }
     } else {
       // Clear form when switching to create mode
       setTitle("");
@@ -106,8 +205,11 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       setCustomFields([]);
       setIsOnline(false);
       setOnlineLink("");
+      setSelectedUsers([]);
+      setUserSearchText("");
+      setUserSearchResults([]);
     }
-  }, [eventToEdit]);
+  }, [eventToEdit, context]);
 
   // ONLINE CHECKBOX START
   const onOnlineCheckboxChange = useCallback(
@@ -210,6 +312,7 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
         AdministratorId: number;
         Placering: string;
         Capacity: number | null;
+        M_x00e5_lgruppeId?: number[] | null; // Målgruppe column internal name
         Online?: {
           Description: string;
           Url: string;
@@ -223,6 +326,8 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
         Capacity: maxParticipants
           ? parseInt(String(maxParticipants), 10)
           : null,
+        M_x00e5_lgruppeId:
+          selectedUsers.length > 0 ? selectedUsers.map((u) => u.Id) : null,
         Online:
           isOnline && onlineLink
             ? {
@@ -309,6 +414,7 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
     onlineLink,
     eventToEdit,
     customFields,
+    selectedUsers,
     onEventCreated,
     onClose,
   ]);
@@ -322,6 +428,13 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       closeButtonAriaLabel="Luk"
     >
       <Stack tokens={{ childrenGap: 15 }}>
+        <TextField
+          label="Title"
+          value={title}
+          onChange={onTitleChange}
+          required
+        />
+
         <DatePicker
           label="Fra"
           firstDayOfWeek={DayOfWeek.Monday}
@@ -341,12 +454,101 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
           onSelectDate={onEndDateChange}
         />
 
-        <TextField
-          label="Title"
-          value={title}
-          onChange={onTitleChange}
-          required
-        />
+        <Stack tokens={{ childrenGap: 10 }}>
+          <Label>Målgruppe (valgfrit)</Label>
+          <Text variant="small" styles={{ root: { color: "#605e5c" } }}>
+            Hvis ingen brugere er valgt, kan alle se eventet. Vælg specifikke
+            brugere for at begrænse synligheden.
+          </Text>
+
+          <SearchBox
+            placeholder="Søg efter bruger..."
+            value={userSearchText}
+            onChange={(_, newValue) => handleUserSearchChange(newValue)}
+          />
+
+          {isSearchingUsers && <Spinner size={SpinnerSize.small} />}
+
+          {userSearchResults.length > 0 && (
+            <Stack
+              tokens={{ childrenGap: 5 }}
+              styles={{
+                root: {
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  border: "1px solid #ccc",
+                  padding: 5,
+                },
+              }}
+            >
+              {userSearchResults.map((user) => (
+                <Stack
+                  key={user.Id}
+                  horizontal
+                  horizontalAlign="space-between"
+                  styles={{
+                    root: {
+                      padding: 8,
+                      backgroundColor: "white",
+                      border: "1px solid #edebe9",
+                      cursor: "pointer",
+                      ":hover": {
+                        backgroundColor: "#f3f2f1",
+                      },
+                    },
+                  }}
+                >
+                  <Stack>
+                    <Text style={{ fontWeight: 600 }}>{user.Title}</Text>
+                    {user.Email && (
+                      <Text style={{ fontSize: 12, color: "#666" }}>
+                        {user.Email}
+                      </Text>
+                    )}
+                  </Stack>
+                  <PrimaryButton
+                    text="Tilføj"
+                    onClick={() => addUserToTargetGroup(user)}
+                  />
+                </Stack>
+              ))}
+            </Stack>
+          )}
+
+          {selectedUsers.length > 0 && (
+            <Stack tokens={{ childrenGap: 5 }}>
+              <Label>Valgte brugere:</Label>
+              {selectedUsers.map((user) => (
+                <Stack
+                  key={user.Id}
+                  horizontal
+                  horizontalAlign="space-between"
+                  styles={{
+                    root: {
+                      padding: 8,
+                      backgroundColor: "#f3f2f1",
+                      border: "1px solid #edebe9",
+                    },
+                  }}
+                >
+                  <Stack>
+                    <Text style={{ fontWeight: 600 }}>{user.Title}</Text>
+                    {user.Email && (
+                      <Text style={{ fontSize: 12, color: "#666" }}>
+                        {user.Email}
+                      </Text>
+                    )}
+                  </Stack>
+                  <IconButton
+                    iconProps={{ iconName: "Delete" }}
+                    title="Fjern bruger"
+                    onClick={() => removeUserFromTargetGroup(user.Id)}
+                  />
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </Stack>
 
         <TextField
           label="Placering"
