@@ -7,7 +7,14 @@ export const formatDate = (date: Date | string | number | undefined): string => 
   } else if (date !== null && date !== undefined && typeof date !== 'object') {
     newDate = new Date(date);
   }
-  return newDate.getDate() + "." + (newDate.getMonth()+1) + "." + newDate.getFullYear();
+  
+  const day = newDate.getDate();
+  const month = newDate.getMonth() + 1;
+  const year = newDate.getFullYear();
+  const hours = ('0' + newDate.getHours()).slice(-2);
+  const minutes = ('0' + newDate.getMinutes()).slice(-2);
+  
+  return day + "." + month + "." + year + " " + hours + ":" + minutes;
 };
 
 // Filters out events that are before today

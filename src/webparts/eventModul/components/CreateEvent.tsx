@@ -7,6 +7,7 @@ import "@pnp/sp/items";
 import "@pnp/sp/site-users/web";
 import {
   DatePicker,
+  TimePicker,
   DayOfWeek,
   PrimaryButton,
   TextField,
@@ -21,10 +22,12 @@ import {
   SearchBox,
   Spinner,
   SpinnerSize,
+  IComboBox,
 } from "@fluentui/react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { IEventItem } from "../components/Utility/IEventItem";
 import AddFieldDialog, { ICustomField } from "./SpecialFields";
+import styles from "./EventModul.module.scss";
 
 interface ICreateEventProps {
   onClose?: () => void;
@@ -40,7 +43,10 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   // Form fields state
   const [title, setTitle] = useState<string>("");
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [startTime, setStartTime] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [endTime, setEndTime] = useState<Date | undefined>(undefined);
+  const [sameDate, setSameDate] = useState<boolean>(false);
   const [selectedUsers, setSelectedUsers] = useState<
     Array<{ Id: number; Title: string; Email: string }>
   >([]);
@@ -159,10 +165,18 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   useEffect(() => {
     if (eventToEdit) {
       setTitle(eventToEdit.Title);
-      setStartDate(eventToEdit.Dato ? new Date(eventToEdit.Dato) : undefined);
-      setEndDate(
-        eventToEdit.SlutDato ? new Date(eventToEdit.SlutDato) : undefined
-      );
+      const startDateTime = eventToEdit.Dato
+        ? new Date(eventToEdit.Dato)
+        : undefined;
+      const endDateTime = eventToEdit.SlutDato
+        ? new Date(eventToEdit.SlutDato)
+        : undefined;
+
+      setStartDate(startDateTime);
+      setStartTime(startDateTime);
+      setEndDate(endDateTime);
+      setEndTime(endDateTime);
+
       setSelectedLocation(eventToEdit.Placering);
       setMaxParticipants(eventToEdit.Capacity);
       setIsOnline(eventToEdit.Placering === "Online");
@@ -199,7 +213,10 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       // Clear form when switching to create mode
       setTitle("");
       setStartDate(undefined);
+      setStartTime(undefined);
       setEndDate(undefined);
+      setEndTime(undefined);
+      setSameDate(false);
       setSelectedLocation(undefined);
       setMaxParticipants(undefined);
       setCustomFields([]);
@@ -267,6 +284,24 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   const onStartDateChange = useCallback(
     (date: Date | null | undefined): void => {
       setStartDate(date || undefined);
+      // If same day is checked, update end date to match start date
+      if (sameDate && date) {
+        setEndDate(date);
+      }
+    },
+    [sameDate]
+  );
+
+  const onStartTimeChange = useCallback(
+    (_event: React.FormEvent<IComboBox>, time: Date): void => {
+      setStartTime(time);
+    },
+    []
+  );
+
+  const onEndTimeChange = useCallback(
+    (_event: React.FormEvent<IComboBox>, time: Date): void => {
+      setEndTime(time);
     },
     []
   );
@@ -274,6 +309,19 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   const onEndDateChange = useCallback((date: Date | null | undefined): void => {
     setEndDate(date || undefined);
   }, []);
+
+  const sameDateChange = useCallback(
+    (
+      event?: React.FormEvent<HTMLElement | HTMLInputElement>,
+      checked?: boolean
+    ): void => {
+      setSameDate(!!checked);
+      if (checked && startDate) {
+        setEndDate(startDate);
+      }
+    },
+    [startDate]
+  );
 
   const onLocationChange = useCallback(
     (
@@ -304,6 +352,19 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       // Get current user's ID for the Administrator field
       const currentUser = await sp.web.currentUser();
 
+      const combineDateAndTime = (date: Date, time?: Date): Date => {
+        const combined = new Date(date.getTime());
+        if (time) {
+          const hours = time.getHours();
+          const minutes = time.getMinutes();
+          combined.setHours(hours, minutes, 0, 0);
+        }
+        return combined;
+      };
+
+      const finalStartDate = combineDateAndTime(startDate, startTime);
+      const finalEndDate = combineDateAndTime(endDate, endTime);
+
       // Prepare the item data with CORRECT column names
       const itemData: {
         Title: string;
@@ -312,22 +373,20 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
         AdministratorId: number;
         Placering: string;
         Capacity: number | null;
-        M_x00e5_lgruppeId?: number[] | null; // Målgruppe column internal name
+        M_x00e5_lgruppeId?: number[];
         Online?: {
           Description: string;
           Url: string;
         } | null;
       } = {
         Title: title,
-        Dato: startDate.toISOString(),
-        SlutDato: endDate.toISOString(),
+        Dato: finalStartDate.toISOString(),
+        SlutDato: finalEndDate.toISOString(),
         AdministratorId: currentUser.Id,
         Placering: isOnline ? "Online" : selectedLocation || "",
         Capacity: maxParticipants
           ? parseInt(String(maxParticipants), 10)
           : null,
-        M_x00e5_lgruppeId:
-          selectedUsers.length > 0 ? selectedUsers.map((u) => u.Id) : null,
         Online:
           isOnline && onlineLink
             ? {
@@ -336,6 +395,11 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
               }
             : null,
       };
+
+      // Only add Target group if users are selected
+      if (selectedUsers.length > 0) {
+        itemData.M_x00e5_lgruppeId = selectedUsers.map((u) => u.Id);
+      }
 
       // Check if we're editing or creating
       let eventId: number;
@@ -406,7 +470,9 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   }, [
     title,
     startDate,
+    startTime,
     endDate,
+    endTime,
     context,
     isOnline,
     selectedLocation,
@@ -435,23 +501,47 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
           required
         />
 
-        <DatePicker
-          label="Fra"
-          firstDayOfWeek={DayOfWeek.Monday}
-          showWeekNumbers={true}
-          placeholder="Vælg start dato"
-          ariaLabel="Vælg start dato"
-          value={startDate}
-          onSelectDate={onStartDateChange}
-        />
-        <DatePicker
-          label="Til"
-          firstDayOfWeek={DayOfWeek.Monday}
-          showWeekNumbers={true}
-          placeholder="Vælg slut dato"
-          ariaLabel="Vælg slut dato"
-          value={endDate}
-          onSelectDate={onEndDateChange}
+        <div className={styles.dateStyle}>
+          <DatePicker
+            label="Fra"
+            firstDayOfWeek={DayOfWeek.Monday}
+            showWeekNumbers={true}
+            placeholder="Vælg start dato"
+            ariaLabel="Vælg start dato"
+            value={startDate}
+            onSelectDate={onStartDateChange}
+          />
+
+          <TimePicker
+            label="Start tidspunkt"
+            dateAnchor={startDate}
+            onChange={onStartTimeChange}
+          />
+        </div>
+
+        <div className={styles.dateStyle}>
+          <DatePicker
+            label="Til"
+            firstDayOfWeek={DayOfWeek.Monday}
+            showWeekNumbers={true}
+            placeholder="Vælg slut dato"
+            ariaLabel="Vælg slut dato"
+            value={endDate}
+            onSelectDate={onEndDateChange}
+            disabled={sameDate}
+          />
+
+          <TimePicker
+            label="Slut tidspunkt"
+            dateAnchor={endDate}
+            onChange={onEndTimeChange}
+          />
+        </div>
+
+        <Checkbox
+          label="Samme dag?"
+          checked={sameDate}
+          onChange={sameDateChange}
         />
 
         <Stack tokens={{ childrenGap: 10 }}>

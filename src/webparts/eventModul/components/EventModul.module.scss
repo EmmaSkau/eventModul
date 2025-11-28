@@ -55,3 +55,14 @@
 .restFilter {
   margin-left: auto;
 }
+
+.dateStyle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.dateStyle > * {
+  flex: 1 1 calc(50% - 20px); 
+  box-sizing: border-box; // Sikrer, at padding og border inkluderes i elementets bredde
+}
