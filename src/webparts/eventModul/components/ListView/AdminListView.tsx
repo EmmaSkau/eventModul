@@ -39,10 +39,6 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
   const [manageRegistrationsOpen, setManageRegistrationsOpen] = useState(false);
   const [selectedEventForRegistrations, setSelectedEventForRegistrations] =
     useState<IEventItem | undefined>();
-  const [manageWaitlistOpen, setManageWaitlistOpen] = useState(false);
-  const [selectedEventForWaitlist, setSelectedEventForWaitlist] = useState<
-    IEventItem | undefined
-  >();
 
   // Load registration counts
   const loadRegistrationCounts = useCallback(async (): Promise<void> => {
@@ -200,17 +196,6 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     loadRegistrationCounts().catch(console.error);
   };
 
-  const openManageWaitlist = (item: IEventItem): void => {
-    setManageWaitlistOpen(true);
-    setSelectedEventForWaitlist(item);
-  };
-
-  const closeManageWaitlist = (): void => {
-    setManageWaitlistOpen(false);
-    setSelectedEventForWaitlist(undefined);
-    loadRegistrationCounts().catch(console.error);
-  };
-
   const getColumns = (): IColumn[] => {
     return [
       {
@@ -314,10 +299,6 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         onRender: (item: IEventItem) => {
           return (
             <div style={{ display: "flex", gap: "8px" }}>
-              <DefaultButton
-                text="venteliste"
-                onClick={() => openManageWaitlist(item)}
-              />
               <DefaultButton text="Ret" onClick={() => handleEditEvent(item)} />
               <PrimaryButton
                 text="Slet"
@@ -374,17 +355,6 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           context={props.context}
           eventId={selectedEventForRegistrations.Id}
           eventTitle={selectedEventForRegistrations.Title}
-        />
-      )}
-
-      {manageWaitlistOpen && selectedEventForWaitlist && (
-        <ManageRegistrations
-          isOpen={manageWaitlistOpen}
-          onDismiss={closeManageWaitlist}
-          context={props.context}
-          eventId={selectedEventForWaitlist.Id}
-          eventTitle={selectedEventForWaitlist.Title}
-          viewType="waitlist"
         />
       )}
     </>

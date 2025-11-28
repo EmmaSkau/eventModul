@@ -29,7 +29,6 @@ interface IManageRegistrationsProps {
   context: WebPartContext;
   eventId: number;
   eventTitle: string;
-  viewType?: "registered" | "waitlist";
 }
 
 interface IRegisteredUser {
@@ -40,20 +39,14 @@ interface IRegisteredUser {
 }
 
 const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
-  const {
-    isOpen,
-    onDismiss,
-    context,
-    eventId,
-    eventTitle,
-    viewType = "registered",
-  } = props;
+  const { isOpen, onDismiss, context, eventId, eventTitle } = props;
 
   // State
   const [registeredUsers, setRegisteredUsers] = useState<IRegisteredUser[]>([]);
+  const [waitlistUsers, setWaitlistUsers] = useState<IRegisteredUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
-  const [showAddUser, setShowAddUser] = useState(false);
+  const [showAddUser, setShowAddUser] = useState<string>("");
   const [searchResults, setSearchResults] = useState<
     Array<{ Id: number; Title: string; Email: string }>
   >([]);
@@ -66,27 +59,27 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       setError(undefined);
       const sp = getSP(context);
 
-      // Build filter based on viewType
-      let filter = `EventId eq ${eventId}`;
-      if (viewType === "waitlist") {
-        filter += " and EventType eq 'Waitlist'";
-      } else if (viewType === "registered") {
-        filter += " and EventType ne 'Waitlist'";
-      }
-
-      const registrations = await sp.web.lists
+      // Load registered users
+      const registered = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(filter)
+        .items.filter(`EventId eq ${eventId} and EventType ne 'Waitlist'`)
         .select("Id", "Title", "BrugerId", "EventType")();
 
-      setRegisteredUsers(registrations);
+      // Load waitlist users
+      const waitlist = await sp.web.lists
+        .getByTitle("EventRegistrations")
+        .items.filter(`EventId eq ${eventId} and EventType eq 'Waitlist'`)
+        .select("Id", "Title", "BrugerId", "EventType")();
+
+      setRegisteredUsers(registered);
+      setWaitlistUsers(waitlist);
       setIsLoading(false);
     } catch (error) {
       console.error("Error loading registrations:", error);
       setIsLoading(false);
-      setError("Kunne ikke indl\u00e6se tilmeldte brugere");
+      setError("Kunne ikke indlæse tilmeldte brugere");
     }
-  }, [context, eventId, viewType]);
+  }, [context, eventId]);
 
   // Load registered users when panel opens
   useEffect(() => {
@@ -152,7 +145,11 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
   );
 
   const addUser = useCallback(
-    async (userId: number, userName: string): Promise<void> => {
+    async (
+      userId: number,
+      userName: string,
+      eventType: string = "Registered"
+    ): Promise<void> => {
       try {
         const sp = getSP(context);
 
@@ -174,12 +171,13 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
           Title: userName,
           EventId: eventId,
           BrugerId: userId,
+          EventType: eventType,
           RegistrationKey: registrationKey,
           Submitted: new Date().toISOString(),
         });
 
         alert("Bruger tilmeldt!");
-        setShowAddUser(false);
+        setShowAddUser("");
         setSearchText("");
         setSearchResults([]);
         await loadRegisteredUsers();
@@ -230,8 +228,8 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
     [searchUsers]
   );
 
-  const handleToggleAddUser = useCallback((): void => {
-    setShowAddUser((prev) => !prev);
+  const handleToggleAddUser = useCallback((type: string): void => {
+    setShowAddUser((prev) => (prev === type ? "" : type));
   }, []);
 
   return (
@@ -239,11 +237,7 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       isOpen={isOpen}
       onDismiss={onDismiss}
       type={PanelType.medium}
-      headerText={
-        viewType === "waitlist"
-          ? `Venteliste for - ${eventTitle}`
-          : `Administrer tilmeldinger til - ${eventTitle}`
-      }
+      headerText={`Administrer tilmeldinger til - ${eventTitle}`}
       closeButtonAriaLabel="Luk"
     >
       <Stack tokens={{ childrenGap: 15 }}>
@@ -255,20 +249,17 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
 
         {!isLoading && !error && (
           <>
+            {/* Registered Users Section */}
             <Stack horizontal horizontalAlign="space-between">
-              <h3>
-                {viewType === "waitlist"
-                  ? `På venteliste (${registeredUsers.length})`
-                  : `Tilmeldte brugere (${registeredUsers.length})`}
-              </h3>
+              <h3>Tilmeldte brugere ({registeredUsers.length})</h3>
               <PrimaryButton
                 text="Tilføj bruger"
                 iconProps={{ iconName: "Add" }}
-                onClick={handleToggleAddUser}
+                onClick={() => handleToggleAddUser("registered")}
               />
             </Stack>
 
-            {showAddUser && (
+            {showAddUser === "registered" && (
               <Stack
                 tokens={{ childrenGap: 10 }}
                 styles={{ root: { padding: 10, backgroundColor: "#f3f2f1" } }}
@@ -306,7 +297,9 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
                         </Stack>
                         <PrimaryButton
                           text="Tilføj"
-                          onClick={() => addUser(user.Id, user.Title)}
+                          onClick={() =>
+                            addUser(user.Id, user.Title, "Registered")
+                          }
                         />
                       </Stack>
                     ))}
@@ -326,6 +319,83 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
             ) : (
               <MessageBar messageBarType={MessageBarType.info}>
                 Ingen tilmeldte brugere
+              </MessageBar>
+            )}
+
+            {/* Waitlist Section */}
+            <Stack
+              horizontal
+              horizontalAlign="space-between"
+              styles={{ root: { marginTop: 20 } }}
+            >
+              <h3>Venteliste ({waitlistUsers.length})</h3>
+              <PrimaryButton
+                text="Tilføj bruger"
+                iconProps={{ iconName: "Add" }}
+                onClick={() => handleToggleAddUser("waitlist")}
+              />
+            </Stack>
+
+            {showAddUser === "waitlist" && (
+              <Stack
+                tokens={{ childrenGap: 10 }}
+                styles={{ root: { padding: 10, backgroundColor: "#f3f2f1" } }}
+              >
+                <SearchBox
+                  placeholder="Søg efter bruger..."
+                  value={searchText}
+                  onChange={(_, newValue) => handleSearchChange(newValue)}
+                />
+
+                {isSearching && <Spinner size={SpinnerSize.small} />}
+
+                {searchResults.length > 0 && (
+                  <Stack tokens={{ childrenGap: 5 }}>
+                    {searchResults.map((user) => (
+                      <Stack
+                        key={user.Id}
+                        horizontal
+                        horizontalAlign="space-between"
+                        styles={{
+                          root: {
+                            padding: 8,
+                            backgroundColor: "white",
+                            border: "1px solid #ccc",
+                          },
+                        }}
+                      >
+                        <Stack>
+                          <span style={{ fontWeight: 600 }}>{user.Title}</span>
+                          {user.Email && (
+                            <span style={{ fontSize: 12, color: "#666" }}>
+                              {user.Email}
+                            </span>
+                          )}
+                        </Stack>
+                        <PrimaryButton
+                          text="Tilføj"
+                          onClick={() =>
+                            addUser(user.Id, user.Title, "Waitlist")
+                          }
+                        />
+                      </Stack>
+                    ))}
+                  </Stack>
+                )}
+              </Stack>
+            )}
+
+            {waitlistUsers.length > 0 ? (
+              <DetailsList
+                items={waitlistUsers}
+                columns={columns}
+                selectionMode={SelectionMode.none}
+                layoutMode={DetailsListLayoutMode.justified}
+                isHeaderVisible={true}
+              />
+            ) : (
+              <MessageBar messageBarType={MessageBarType.info}>
+                Ingen brugere på ventelisten
               </MessageBar>
             )}
           </>
