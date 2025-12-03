@@ -41,9 +41,14 @@
   margin-bottom: 20px;
 }
 
-.filters > * {
-  flex: 1 1 calc(33.33% - 20px); // Hvert element fylder 1/3 af pladsen minus gap
-  box-sizing: border-box; // Sikrer, at padding og border inkluderes i elementets bredde
+.filters > :not(button) {
+  flex: 1 1 200px; // Grow to take up space, but minimum 200px
+  box-sizing: border-box;
+}
+
+.filters > button {
+  flex: 0 0 auto; 
+  align-self: flex-end;
 }
 
 .filterToggle {
@@ -53,7 +58,7 @@
 }
 
 .restFilter {
-  margin-left: auto;
+  padding: 1em;
 }
 
 .dateStyle {

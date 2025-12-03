@@ -1,132 +1,41 @@
 import * as React from "react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import styles from "./EventModul.module.scss";
 import type { IEventModulProps } from "./Utility/IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
 import {
-  DatePicker,
-  DayOfWeek,
-  Dropdown,
-  IDropdownOption,
   Toggle,
   DefaultButton,
   PrimaryButton,
 } from "@fluentui/react";
-import { formatDate } from "./Utility/formatDate";
-import { getSP } from "../../../pnpConfig";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
 import ListView from "./ListView/ListView";
 import RegisteredListView from "../components/ListView/RegisteredListView";
 import AdminPage from "./adminPage";
+import FilterUtility, { useLocationFilter } from "./Utility/filterUtility";
 
-interface ILocationItem {
-  Placering: string;
-}
 
 const EventModul: React.FC<IEventModulProps> = (props) => {
   const { hasTeamsContext, userDisplayName, context } = props;
+const {
+    startDate,
+    endDate,
+    selectedLocation,
+    locationOptions,
+    isLoadingLocations,
+    onLocationChange,
+    onStartDateSelect,
+    onEndDateSelect,
+    resetFilters,
+  } = useLocationFilter(props.context);
 
   // State
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
-  const [selectedLocation, setSelectedLocation] = useState<string | undefined>(
-    undefined
-  );
-  const [locationOptions, setLocationOptions] = useState<IDropdownOption[]>([]);
-  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [waitlisted, setWaitlisted] = useState(false);
   const [showAdminPage, setShowAdminPage] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  const loadLocationsFromSharePoint = useCallback(async (): Promise<void> => {
-    try {
-      setIsLoadingLocations(true);
-      const sp = getSP(context);
-
-      // Get all items with Placering field (Location field can't be filtered in query)
-      const items: ILocationItem[] = await sp.web.lists
-        .getByTitle("EventDB")
-        .items.select("Placering")();
-
-      console.log("Loaded items from SharePoint:", items);
-
-      const locations = items
-        .map((item: ILocationItem) => {
-          if (!item.Placering) return null;
-          try {
-            const parsed = JSON.parse(item.Placering);
-            return parsed.DisplayName || item.Placering;
-          } catch {
-            return item.Placering;
-          }
-        })
-        .filter((location) => location);
-      const uniqueLocations: string[] = [];
-      const seen: { [key: string]: boolean } = {};
-      for (const location of locations) {
-        if (!seen[location]) {
-          seen[location] = true;
-          uniqueLocations.push(location);
-        }
-      }
-
-      const options: IDropdownOption[] = [
-        { key: "all", text: "Alle lokationer" },
-        ...uniqueLocations.map((location: string) => ({
-          key: location,
-          text: location,
-        })),
-      ];
-
-      setLocationOptions(options);
-      setIsLoadingLocations(false);
-    } catch (error) {
-      console.error("Error loading locations from SharePoint:", error);
-      setIsLoadingLocations(false);
-      setLocationOptions([{ key: "all", text: "Alle lokationer" }]);
-    }
-  }, [context]);
-
-  // Load locations on mount
-  useEffect(() => {
-    loadLocationsFromSharePoint().catch((error) => {
-      console.error("Error in componentDidMount:", error);
-    });
-  }, [loadLocationsFromSharePoint]);
-
-  const onLocationChange = useCallback(
-    (
-      event: React.FormEvent<HTMLDivElement>,
-      option?: IDropdownOption
-    ): void => {
-      if (option) {
-        setSelectedLocation(option.key as string);
-      }
-    },
-    []
-  );
-
-  const onStartDateSelect = useCallback(
-    (date: Date | null | undefined): void => {
-      setStartDate(date || undefined);
-    },
-    []
-  );
-
-  const onEndDateSelect = useCallback((date: Date | null | undefined): void => {
-    setEndDate(date || undefined);
-  }, []);
-
-  const resetFilters = useCallback((): void => {
-    setStartDate(undefined);
-    setEndDate(undefined);
-    setSelectedLocation(undefined);
-    setRegistered(false);
-    setWaitlisted(false);
-  }, []);
 
   const handleRefresh = useCallback((): void => {
     setRefreshTrigger((prev) => prev + 1);
@@ -152,38 +61,20 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
         <PrimaryButton text="Admin page" onClick={handleOpenAdminPage} />
       </div>
 
-      <section className={styles.filters}>
-        <DatePicker
-          label="Fra"
-          firstDayOfWeek={DayOfWeek.Monday}
-          placeholder="Vælg start dato..."
-          ariaLabel="Vælg start dato"
-          value={startDate}
-          onSelectDate={onStartDateSelect}
-          formatDate={formatDate}
-        />
+      
+      <FilterUtility 
+        context={props.context}
+        startDate={startDate}
+        endDate={endDate}
+        selectedLocation={selectedLocation}
+        locationOptions={locationOptions}
+        isLoadingLocations={isLoadingLocations}
+        onLocationChange={onLocationChange}
+        onStartDateSelect={onStartDateSelect}
+        onEndDateSelect={onEndDateSelect}
+        resetFilters={resetFilters}
+      />
 
-        <DatePicker
-          label="Til"
-          firstDayOfWeek={DayOfWeek.Monday}
-          placeholder="Vælg slut dato..."
-          ariaLabel="Vælg slut dato"
-          value={endDate}
-          onSelectDate={onEndDateSelect}
-          formatDate={formatDate}
-        />
-
-        <Dropdown
-          label="Lokation"
-          placeholder={
-            isLoadingLocations ? "Indlæser lokationer..." : "Vælg lokation..."
-          }
-          options={locationOptions}
-          selectedKey={selectedLocation}
-          onChange={onLocationChange}
-          disabled={isLoadingLocations}
-        />
-      </section>
       <section className={styles.filterToggle}>
         <Toggle
           label="Tilmeldt"
@@ -207,11 +98,6 @@ const EventModul: React.FC<IEventModulProps> = (props) => {
           }}
         />
 
-        <DefaultButton
-          className={styles.restFilter}
-          text="Ryd filtre"
-          onClick={resetFilters}
-        />
         <DefaultButton
           text="Opdater liste"
           iconProps={{ iconName: "Refresh" }}

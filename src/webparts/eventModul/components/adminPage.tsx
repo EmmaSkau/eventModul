@@ -1,17 +1,31 @@
 import * as React from "react";
-import { useState, useCallback } from "react";
+import { useState, useCallback,  } from "react";
 import styles from "./EventModul.module.scss";
 import type { IEventModulProps } from "./Utility/IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
-import { PrimaryButton, ActionButton, IIconProps } from "@fluentui/react";
+import { PrimaryButton,} from "@fluentui/react";
 import CreateEvent from "./CreateEvent";
 import AdminListView from "./ListView/AdminListView";
+import FilterUtility, { useLocationFilter } from "./Utility/filterUtility";
 
 interface IAdminPageProps extends IEventModulProps {
   onClose?: () => void;
 }
 
 const AdminPage: React.FC<IAdminPageProps> = (props) => {
+  // Use the filter hook to get filter state
+  const {
+    startDate,
+    endDate,
+    selectedLocation,
+    locationOptions,
+    isLoadingLocations,
+    onLocationChange,
+    onStartDateSelect,
+    onEndDateSelect,
+    resetFilters,
+  } = useLocationFilter(props.context);
+
   // State
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -45,9 +59,6 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
   // Render
   const { hasTeamsContext, userDisplayName } = props;
 
-  const monthIcon: IIconProps = { iconName: "Calendar" };
-  const thisYearIcon: IIconProps = { iconName: "CalendarYear" };
-
   return (
     <section
       className={`${styles.eventModul} ${hasTeamsContext ? styles.teams : ""}`}
@@ -60,6 +71,19 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
 
       <PrimaryButton text="Opret ny event" onClick={handleCreateEvent} />
 
+      <FilterUtility 
+        context={props.context}
+        startDate={startDate}
+        endDate={endDate}
+        selectedLocation={selectedLocation}
+        locationOptions={locationOptions}
+        isLoadingLocations={isLoadingLocations}
+        onLocationChange={onLocationChange}
+        onStartDateSelect={onStartDateSelect}
+        onEndDateSelect={onEndDateSelect}
+        resetFilters={resetFilters}
+      />
+
       <CreateEvent
         isOpen={showCreateEvent}
         onClose={handleCloseCreateEvent}
@@ -67,25 +91,13 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
         onEventCreated={handleEventCreated}
       />
 
-      <div>
-        <ActionButton
-          iconProps={monthIcon}
-          allowDisabledFocus
-          disabled={false}
-          checked={false}
-        >
-          Denne måned
-        </ActionButton>
-        <ActionButton
-          iconProps={thisYearIcon}
-          allowDisabledFocus
-          disabled={false}
-          checked={false}
-        >
-          Dette år
-        </ActionButton>
-      </div>
-      <AdminListView key={refreshTrigger} context={props.context} />
+      <AdminListView 
+        key={refreshTrigger} 
+        context={props.context} 
+        startDate={startDate}
+        endDate={endDate}
+        selectedLocation={selectedLocation}
+      />
     </section>
   );
 };
