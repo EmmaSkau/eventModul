@@ -335,9 +335,9 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
 
   // SAVE EVENT
   const saveEvent = useCallback(async (): Promise<void> => {
+    setIsSaving(true);
+    
     try {
-      setIsSaving(true);
-
       // Validation
       if (!title || !startDate || !endDate) {
         alert(
