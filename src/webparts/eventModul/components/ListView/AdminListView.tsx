@@ -45,10 +45,11 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     try {
       const sp = getSP(props.context);
 
-      // Get all registrations
+      // Get only registered users (not waitlist)
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.select("EventId")();
+        .items.filter("EventType eq 'Registered'")
+        .select("EventId")();
 
       // Count registrations per event
       const counts: { [eventId: number]: number } = {};
@@ -173,6 +174,33 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     try {
       const sp = getSP(props.context);
 
+      // Delete all registrations 
+      const registrations = await sp.web.lists
+        .getByTitle("EventRegistrations")
+        .items.filter(`EventId eq ${item.Id}`)
+        .select("Id")();
+
+      for (const registration of registrations) {
+        await sp.web.lists
+          .getByTitle("EventRegistrations")
+          .items.getById(registration.Id)
+          .delete();
+      }
+
+      // Delete all event fields 
+      const eventFields = await sp.web.lists
+        .getByTitle("EventFields")
+        .items.filter(`EventId eq ${item.Id}`)
+        .select("Id")();
+
+      for (const field of eventFields) {
+        await sp.web.lists
+          .getByTitle("EventFields")
+          .items.getById(field.Id)
+          .delete();
+      }
+
+      // Delete the event itself
       await sp.web.lists.getByTitle("EventDB").items.getById(item.Id).delete();
 
       alert("Event slettet!");
