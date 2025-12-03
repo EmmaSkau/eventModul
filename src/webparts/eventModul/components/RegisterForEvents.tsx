@@ -132,12 +132,14 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
   }, [fields, fieldValues]);
 
   const handleSubmit = useCallback(async (): Promise<void> => {
+    setIsSaving(true);
+    
     if (!validateForm()) {
+      setIsSaving(false);
       return;
     }
 
     try {
-      setIsSaving(true);
       setError(undefined);
       const sp = getSP(context);
 
@@ -184,7 +186,7 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
       // Close panel after 2 seconds
       setTimeout(() => {
         onDismiss();
-      }, 2000);
+      }, 500);
     } catch (error) {
       console.error("Error submitting registration:", error);
       setIsSaving(false);
