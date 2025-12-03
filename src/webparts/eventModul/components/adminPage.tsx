@@ -3,7 +3,7 @@ import { useState, useCallback,  } from "react";
 import styles from "./EventModul.module.scss";
 import type { IEventModulProps } from "./Utility/IEventModulProps";
 import { escape } from "@microsoft/sp-lodash-subset";
-import { PrimaryButton,} from "@fluentui/react";
+import { PrimaryButton, Toggle} from "@fluentui/react";
 import CreateEvent from "./CreateEvent";
 import AdminListView from "./ListView/AdminListView";
 import FilterUtility, { useLocationFilter } from "./Utility/filterUtility";
@@ -29,6 +29,7 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
   // State
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showPastEvents, setShowPastEvents] = useState(false);
 
   // Event handlers
   const handleCreateEvent = useCallback((): void => {
@@ -83,6 +84,12 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
         onEndDateSelect={onEndDateSelect}
         resetFilters={resetFilters}
       />
+      
+      <Toggle
+        label="Afholdte events"
+        checked={showPastEvents}
+        onChange={(_, checked) => setShowPastEvents(!!checked)}
+      />
 
       <CreateEvent
         isOpen={showCreateEvent}
@@ -97,6 +104,7 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
         startDate={startDate}
         endDate={endDate}
         selectedLocation={selectedLocation}
+        showPastEvents={showPastEvents}
       />
     </section>
   );

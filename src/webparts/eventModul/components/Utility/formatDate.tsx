@@ -44,3 +44,31 @@ export const getFutureEventsSorted = (items: IEventItem[]): IEventItem[] => {
   const futureEvents = filterFutureEvents(items);
   return sortEventsByDate(futureEvents);
 };
+
+// Filters out events that are after or equal to today (i.e., returns only past events)
+export const filterPastEvents = (items: IEventItem[]): IEventItem[] => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return items.filter((item) => {
+    if (!item.Dato) return false;
+    const eventDate = new Date(item.Dato);
+    eventDate.setHours(0, 0, 0, 0);
+    return eventDate < today;
+  });
+};
+
+// Sorts events by date descending (most recent first)
+export const sortEventsByDateDescending = (items: IEventItem[]): IEventItem[] => {
+  return [...items].sort((a, b) => {
+    if (!a.Dato) return 1;
+    if (!b.Dato) return -1;
+    return new Date(b.Dato).getTime() - new Date(a.Dato).getTime();
+  });
+};
+
+// Filters past events and sorts them by date descending
+export const getPastEventsSorted = (items: IEventItem[]): IEventItem[] => {
+  const pastEvents = filterPastEvents(items);
+  return sortEventsByDateDescending(pastEvents);
+};

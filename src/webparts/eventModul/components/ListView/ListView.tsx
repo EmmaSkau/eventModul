@@ -322,7 +322,7 @@ const ListView: React.FC<IListViewProps> = (props) => {
       },
       {
         key: "Capacity",
-        name: "Ledige pladser",
+        name: "Pladser",
         fieldName: "Capacity",
         minWidth: 80,
         maxWidth: 100,

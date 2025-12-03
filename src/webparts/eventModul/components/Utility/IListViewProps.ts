@@ -8,4 +8,5 @@ export interface IListViewProps {
   registered?: boolean;
   cancelledEvents?: boolean;
   waitlisted?: boolean;
+  showPastEvents?: boolean;
 }

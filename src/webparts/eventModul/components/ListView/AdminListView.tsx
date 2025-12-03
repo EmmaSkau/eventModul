@@ -21,7 +21,7 @@ import {
 import CreateEvent from "../CreateEvent";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
-import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
+import { getFutureEventsSorted, getPastEventsSorted, formatDate } from "../Utility/formatDate";
 import ManageRegistrations from "../ManageRegistrations";
 
 const AdminListView: React.FC<IListViewProps> = (props) => {
@@ -102,11 +102,16 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         });
       }
 
-      filtered = getFutureEventsSorted(filtered);
+      // Show past or future events based on toggle
+      if (props.showPastEvents) {
+        filtered = getPastEventsSorted(filtered);
+      } else {
+        filtered = getFutureEventsSorted(filtered);
+      }
 
       return filtered;
     },
-    [props.startDate, props.endDate, props.selectedLocation]
+    [props.startDate, props.endDate, props.selectedLocation, props.showPastEvents]
   );
 
   // Load events
@@ -230,16 +235,16 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         key: "Title",
         name: "Titel",
         fieldName: "Title",
-        minWidth: 100,
-        maxWidth: 150,
+        minWidth: 200,
+        maxWidth: 250,
         isResizable: true,
       },
       {
         key: "StartDato",
         name: "Start Dato",
         fieldName: "Dato",
-        minWidth: 60,
-        maxWidth: 80,
+        minWidth: 80,
+        maxWidth: 100,
         isResizable: true,
         onRender: (item: IEventItem) => {
           return item.Dato ? formatDate(item.Dato) : "-";
@@ -249,30 +254,19 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         key: "SlutDato",
         name: "Slut Dato",
         fieldName: "SlutDato",
-        minWidth: 60,
-        maxWidth: 80,
+        minWidth: 80,
+        maxWidth: 100,
         isResizable: true,
         onRender: (item: IEventItem) => {
           return item.SlutDato ? formatDate(item.SlutDato) : "-";
         },
       },
       {
-        key: "Administrator",
-        name: "Administrator",
-        fieldName: "Administrator",
-        minWidth: 80,
-        maxWidth: 100,
-        isResizable: true,
-        onRender: (item: IEventItem) => {
-          return item.Administrator?.Title || "-";
-        },
-      },
-      {
         key: "Placering",
         name: "Placering",
         fieldName: "Placering",
-        minWidth: 80,
-        maxWidth: 100,
+        minWidth: 100,
+        maxWidth: 120,
         isResizable: true,
         onRender: (item: IEventItem) => {
           if (!item.Placering) return "-";
@@ -288,8 +282,8 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         key: "targetGroup",
         name: "Målgruppe",
         fieldName: "targetGroup",
-        minWidth: 80,
-        maxWidth: 120,
+        minWidth: 120,
+        maxWidth: 150,
         isResizable: true,
       },
       {
