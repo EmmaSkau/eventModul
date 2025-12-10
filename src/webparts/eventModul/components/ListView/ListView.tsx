@@ -40,11 +40,14 @@ const ListView: React.FC<IListViewProps> = (props) => {
   const loadRegistrationCounts = useCallback(async (): Promise<void> => {
     try {
       const sp = getSP(props.context);
+      const timestamp = Date.now();
 
       // Get all registrations
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.select("EventId", "EventType")();
+        .items.filter(`Id ge 0 or Id eq ${timestamp}`)
+        .select("EventId", "EventType")
+        .top(5000)();
 
       // Count registrations per event
       const counts: { [eventId: number]: number } = {};
@@ -107,10 +110,12 @@ const ListView: React.FC<IListViewProps> = (props) => {
       setIsLoading(true);
       setError(undefined);
       const sp = getSP(props.context);
+      const timestamp = Date.now();
 
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
-        .items.select(
+        .items.filter(`Id ge 0 or Id eq ${timestamp}`)
+        .select(
           "Id",
           "Title",
           "Dato",
@@ -138,11 +143,13 @@ const ListView: React.FC<IListViewProps> = (props) => {
     try {
       const sp = getSP(props.context);
       const currentUser = await sp.web.currentUser();
+      const timestamp = Date.now();
 
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`Title eq '${currentUser.Title}'`)
-        .select("EventId", "EventType")();
+        .items.filter(`Title eq '${currentUser.Title}' and (Id ge 0 or Id eq ${timestamp})`)
+        .select("EventId", "EventType")
+        .top(5000)();
 
       const registeredEventIds = registrations
         .map((reg) => reg.EventId)
@@ -171,10 +178,12 @@ const ListView: React.FC<IListViewProps> = (props) => {
     async (eventId: number): Promise<boolean> => {
       try {
         const sp = getSP(props.context);
+        const timestamp = Date.now();
         const fields = await sp.web.lists
           .getByTitle("EventFields")
-          .items.filter(`EventId eq ${eventId}`)
-          .select("Id")();
+          .items.filter(`EventId eq ${eventId} and (Id ge 0 or Id eq ${timestamp})`)
+          .select("Id")
+          .top(5000)();
 
         return fields.length > 0;
       } catch (error) {

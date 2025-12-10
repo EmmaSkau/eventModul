@@ -60,35 +60,42 @@ const RegisterForEvents: React.FC<IRegisterForEventsProps> = (props) => {
       const sp = getSP(context);
 
       // Load event details for capacity
-      const event = await sp.web.lists
+      const timestamp = Date.now();
+      const eventItems = await sp.web.lists
         .getByTitle("EventDB")
-        .items.getById(eventId)
-        .select("Capacity")();
+        .items.filter(`Id eq ${eventId} or Id eq ${timestamp}`)
+        .select("Capacity")
+        .top(1)();
+      
+      const event = eventItems[0] || { Capacity: 0 };
 
       setCapacity(event.Capacity || 0);
 
       // Load current registration count (only 'Registered' status)
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${eventId} and EventType eq 'Registered'`)
-        .select("Id")();
+        .items.filter(`EventId eq ${eventId} and EventType eq 'Registered' and (Id ge 0 or Id eq ${timestamp})`)
+        .select("Id")
+        .top(5000)();
 
       setRegistrationCount(registrations.length);
 
       // Load custom fields
       const allItems = await sp.web.lists
         .getByTitle("EventFields")
-        .items.select(
+        .items.filter(`Id ge 0 or Id eq ${timestamp}`)
+        .select(
           "Id",
           "Title",
           "EventId",
           "FeltType",
           "Valgmuligheder",
           "P_x00e5_kr_x00e6_vet"
-        )();
+        )
+        .top(5000)();
 
       const eventFields: IEventField[] = allItems.filter(
-        (item) => item.EventId === eventId
+        (item: { EventId?: number }) => item.EventId === eventId
       );
 
       setFields(eventFields);

@@ -133,18 +133,16 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
     async (eventId: number): Promise<void> => {
       try {
         const sp = getSP(context);
-        const fields = await sp.web.lists
+        // Force fresh data by using unique filter each time
+        const timestamp = Date.now();
+        const data = await sp.web.lists
           .getByTitle("EventFields")
-          .items.filter(`EventId eq ${eventId}`)
-          .select(
-            "Id",
-            "Title",
-            "FeltType",
-            "Valgmuligheder",
-            "P_x00e5_kr_x00e6_vet"
-          )();
-
-        setCustomFields(fields);
+          .items
+          .filter(`EventId eq ${eventId} and (Id ge 0 or Id eq ${timestamp})`)
+          .select("Id", "Title", "FeltType", "Valgmuligheder", "P_x00e5_kr_x00e6_vet")
+          .top(5000)();
+        
+        setCustomFields(data);
       } catch (error) {
         console.error("Error loading custom fields:", error);
       }
@@ -416,11 +414,16 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
           .items.filter(`EventId eq ${eventId}`)
           .select("Id")();
 
-        for (const existingField of existingFields) {
-          await sp.web.lists
-            .getByTitle("EventFields")
-            .items.getById(existingField.Id)
-            .delete();
+        // Delete all fields in parallel using Promise.all
+        if (existingFields.length > 0) {
+          await Promise.all(
+            existingFields.map((existingField) =>
+              sp.web.lists
+                .getByTitle("EventFields")
+                .items.getById(existingField.Id)
+                .delete()
+            )
+          );
         }
 
         alert("Event opdateret!");
@@ -435,16 +438,18 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
 
       // Save custom fields to EventFields list (only if there are any)
       if (customFields.length > 0) {
-        for (const field of customFields) {
-          await sp.web.lists.getByTitle("EventFields").items.add({
-            Title: field.fieldName,
-            EventId: eventId,
-            FeltType: field.fieldType,
-            Valgmuligheder: field.options
-              ? JSON.stringify(field.options)
-              : null,
-          });
-        }
+        await Promise.all(
+          customFields.map((field) =>
+            sp.web.lists.getByTitle("EventFields").items.add({
+              Title: field.fieldName,
+              EventId: eventId,
+              FeltType: field.fieldType,
+              Valgmuligheder: field.options
+                ? JSON.stringify(field.options)
+                : null,
+            })
+          )
+        );
       }
 
       // Notify parent that event was created/updated so ListView can refresh

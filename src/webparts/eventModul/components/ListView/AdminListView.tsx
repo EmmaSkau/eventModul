@@ -14,7 +14,6 @@ import {
   SpinnerSize,
   MessageBar,
   MessageBarType,
-  PrimaryButton,
   DefaultButton,
   ActionButton,
 } from "@fluentui/react";
@@ -46,15 +45,17 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
       const sp = getSP(props.context);
 
       // Get only registered users (not waitlist)
+      const timestamp = Date.now();
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter("EventType eq 'Registered'")
-        .select("EventId")();
+        .items.filter(`EventType eq 'Registered' and (Id ge 0 or Id eq ${timestamp})`)
+        .select("EventId")
+        .top(5000)();
 
       // Count registrations per event
       const counts: { [eventId: number]: number } = {};
 
-      registrations.forEach((reg) => {
+      registrations.forEach((reg: { EventId?: number }) => {
         if (reg.EventId) {
           counts[reg.EventId] = (counts[reg.EventId] || 0) + 1;
         }
@@ -122,9 +123,11 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
       const sp = getSP(props.context);
       const currentUserEmail = props.context.pageContext.user.email;
 
+      const timestamp = Date.now();
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
-        .items.select(
+        .items
+        .select(
           "Id",
           "Title",
           "Dato",
@@ -134,7 +137,7 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           "Capacity"
         )
         .expand("Administrator")
-        .filter(`Administrator/EMail eq '${currentUserEmail}'`)
+        .filter(`Administrator/EMail eq '${currentUserEmail}' and (Id ge 0 or Id eq ${timestamp})`)
         .top(1000)();
 
       const filteredItems = filterEvents(items);
@@ -185,25 +188,27 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         .items.filter(`EventId eq ${item.Id}`)
         .select("Id")();
 
-      for (const registration of registrations) {
-        await sp.web.lists
-          .getByTitle("EventRegistrations")
-          .items.getById(registration.Id)
-          .delete();
-      }
-
       // Delete all event fields 
       const eventFields = await sp.web.lists
         .getByTitle("EventFields")
         .items.filter(`EventId eq ${item.Id}`)
         .select("Id")();
 
-      for (const field of eventFields) {
-        await sp.web.lists
-          .getByTitle("EventFields")
-          .items.getById(field.Id)
-          .delete();
-      }
+      // Delete all registrations and fields in parallel using Promise.all
+      await Promise.all([
+        ...registrations.map((registration) =>
+          sp.web.lists
+            .getByTitle("EventRegistrations")
+            .items.getById(registration.Id)
+            .delete()
+        ),
+        ...eventFields.map((field) =>
+          sp.web.lists
+            .getByTitle("EventFields")
+            .items.getById(field.Id)
+            .delete()
+        ),
+      ]);
 
       // Delete the event itself
       await sp.web.lists.getByTitle("EventDB").items.getById(item.Id).delete();
@@ -322,9 +327,10 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           return (
             <div style={{ display: "flex", gap: "8px" }}>
               <DefaultButton text="Ret" onClick={() => handleEditEvent(item)} />
-              <PrimaryButton
-                text="Slet"
+              <DefaultButton 
+                text="Slet" 
                 onClick={() => handleDeleteEvent(item)}
+                styles={{ root: { color: '#a4262c' }, rootHovered: { color: '#8c1c1e' } }}
               />
             </div>
           );

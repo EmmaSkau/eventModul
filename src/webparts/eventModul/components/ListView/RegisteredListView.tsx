@@ -81,16 +81,12 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
         registrationFilter += " and EventType ne 'Waitlist'";
       }
 
-      console.log("RegisteredListView - waitlisted:", props.waitlisted); // DEBUG
-      console.log("RegisteredListView - registered:", props.registered); // DEBUG
-      console.log("RegisteredListView - filter:", registrationFilter); // DEBUG
-
+      const timestamp = Date.now();
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(registrationFilter)
-        .select("EventId", "EventType")();
-
-      console.log("RegisteredListView - registrations found:", registrations); // DEBUG
+        .items.filter(`${registrationFilter} and (Id ge 0 or Id eq ${timestamp})`)
+        .select("EventId", "EventType")
+        .top(5000)();
 
       const registeredEventIds = registrations
         .map((reg) => reg.EventId)
@@ -108,7 +104,8 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
 
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
-        .items.select(
+        .items.filter(`(${idFilters}) and (Id ge 0 or Id eq ${timestamp})`)
+        .select(
           "Id",
           "Title",
           "Dato",
@@ -119,7 +116,6 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
           "Online"
         )
         .expand("Administrator")
-        .filter(idFilters)
         .top(1000)();
 
       const filteredItems = filterEvents(items);
@@ -154,12 +150,14 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
     try {
       const sp = getSP(props.context);
       const currentUser = await sp.web.currentUser();
+      const timestamp = Date.now();
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
         .items.filter(
-          `Title eq '${currentUser.Title}' and EventId eq ${item.Id}`
+          `Title eq '${currentUser.Title}' and EventId eq ${item.Id} and (Id ge 0 or Id eq ${timestamp})`
         )
-        .select("Id")();
+        .select("Id")
+        .top(5000)();
 
       if (registrations.length === 0) {
         alert("Kunne ikke finde din tilmelding.");

@@ -60,16 +60,19 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       const sp = getSP(context);
 
       // Load registered users
+      const timestamp = Date.now();
       const registered = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${eventId} and EventType ne 'Waitlist'`)
-        .select("Id", "Title", "BrugerId", "EventType")();
+        .items.filter(`EventId eq ${eventId} and EventType ne 'Waitlist' and (Id ge 0 or Id eq ${timestamp})`)
+        .select("Id", "Title", "BrugerId", "EventType")
+        .top(5000)();
 
       // Load waitlist users
       const waitlist = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${eventId} and EventType eq 'Waitlist'`)
-        .select("Id", "Title", "BrugerId", "EventType")();
+        .items.filter(`EventId eq ${eventId} and EventType eq 'Waitlist' and (Id ge 0 or Id eq ${timestamp})`)
+        .select("Id", "Title", "BrugerId", "EventType")
+        .top(5000)();
 
       setRegisteredUsers(registered);
       setWaitlistUsers(waitlist);
