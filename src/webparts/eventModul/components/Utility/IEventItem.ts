@@ -9,6 +9,7 @@ export interface IEventItem {
   Placering?: string;
   targetGroup?: string;
   M_x00e5_lgruppeId?: number[];
+  M_x00e5_lgruppe?: Array<{ Title: string }>;
   Beskrivelse?: string;
   TilfoejEkstraInfo?: string;
   Capacity?: number;

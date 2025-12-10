@@ -148,9 +148,10 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           "SlutDato",
           "Administrator/Title",
           "Placering",
-          "Capacity"
+          "Capacity",
+          "M_x00e5_lgruppe/Title"
         )
-        .expand("Administrator")
+        .expand("Administrator", "M_x00e5_lgruppe")
         .filter(
           `Administrator/EMail eq '${currentUserEmail}' and (Id ge 0 or Id eq ${timestamp})`
         )
@@ -317,6 +318,12 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
         minWidth: 120,
         maxWidth: 150,
         isResizable: true,
+        onRender: (item: IEventItem) => {
+          if (item.M_x00e5_lgruppe && Array.isArray(item.M_x00e5_lgruppe)) {
+            return item.M_x00e5_lgruppe.map((user: { Title: string }) => user.Title).join(", ");
+          }
+          return "-";
+        },
       },
       {
         key: "tilmeldt",

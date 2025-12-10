@@ -341,14 +341,6 @@ const ListView: React.FC<IListViewProps> = (props) => {
         },
       },
       {
-        key: "targetGroup",
-        name: "Målgruppe",
-        fieldName: "targetGroup",
-        minWidth: 100,
-        maxWidth: 150,
-        isResizable: true,
-      },
-      {
         key: "Capacity",
         name: "Pladser",
         fieldName: "Capacity",
