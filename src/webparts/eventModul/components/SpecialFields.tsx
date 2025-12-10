@@ -7,6 +7,8 @@ import {
   Stack,
   PrimaryButton,
   DefaultButton,
+  MessageBar,
+  MessageBarType,
 } from "@fluentui/react";
 
 export interface ICustomField {
@@ -31,6 +33,7 @@ const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({
     "text"
   );
   const [newFieldOptions, setNewFieldOptions] = useState("");
+  const [validationMessage, setValidationMessage] = useState<string | undefined>();
 
   // Event handlers
   const onFieldNameChange = useCallback(
@@ -66,14 +69,16 @@ const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({
   );
 
   const handleAddField = useCallback((): void => {
+    setValidationMessage(undefined);
+
     // Validation
     if (!newFieldName.trim()) {
-      alert("Indtast venligst et feltnavn");
+      setValidationMessage("Indtast venligst et feltnavn");
       return;
     }
 
     if (newFieldType === "multipleChoice" && !newFieldOptions.trim()) {
-      alert("Indtast venligst valgmuligheder for flervalg");
+      setValidationMessage("Indtast venligst valgmuligheder for flervalg");
       return;
     }
 
@@ -120,6 +125,15 @@ const AddFieldDialog: React.FC<IAddFieldDialogProps> = ({
       tokens={{ childrenGap: 15 }}
       styles={{ root: { padding: "10px 0" } }}
     >
+      {validationMessage && (
+        <MessageBar
+          messageBarType={MessageBarType.warning}
+          onDismiss={() => setValidationMessage(undefined)}
+        >
+          {validationMessage}
+        </MessageBar>
+      )}
+
       <TextField
         label="Feltnavn"
         placeholder="fx T-shirt størrelse"

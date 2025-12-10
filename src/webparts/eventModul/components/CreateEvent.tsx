@@ -23,6 +23,8 @@ import {
   Spinner,
   SpinnerSize,
   IComboBox,
+  MessageBar,
+  MessageBarType,
 } from "@fluentui/react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { IEventItem } from "../components/Utility/IEventItem";
@@ -68,6 +70,11 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
 
   // Loading states
   const [isSaving, setIsSaving] = useState(false);
+
+  // Message states
+  const [successMessage, setSuccessMessage] = useState<string | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const [validationMessage, setValidationMessage] = useState<string | undefined>();
 
   // Search for users
   const searchUsers = useCallback(
@@ -334,12 +341,15 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
   // SAVE EVENT
   const saveEvent = useCallback(async (): Promise<void> => {
     setIsSaving(true);
+    setSuccessMessage(undefined);
+    setErrorMessage(undefined);
+    setValidationMessage(undefined);
     
     try {
       // Validation
       if (!title || !startDate || !endDate) {
-        alert(
-          "Please fill in all required fields (Title, Start Date, End Date)"
+        setValidationMessage(
+          "Udfyld venligst alle påkrævede felter (Titel, Start Dato, Slut Dato)"
         );
         setIsSaving(false);
         return;
@@ -426,14 +436,14 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
           );
         }
 
-        alert("Event opdateret!");
+        setSuccessMessage("Event opdateret!");
       } else {
         // CREATE new item
         const addResult = await sp.web.lists
           .getByTitle("EventDB")
           .items.add(itemData);
         eventId = addResult.data?.Id || addResult.Id;
-        alert("Event oprettet!");
+        setSuccessMessage("Event oprettet!");
       }
 
       // Save custom fields to EventFields list (only if there are any)
@@ -465,7 +475,7 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       }
     } catch (error) {
       console.error("Error saving event:", error);
-      alert(
+      setErrorMessage(
         eventToEdit
           ? "Fejl ved opdatering af event. Prøv igen."
           : "Fejl ved oprettelse af event. Prøv igen."
@@ -499,6 +509,31 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       closeButtonAriaLabel="Luk"
     >
       <Stack tokens={{ childrenGap: 15 }}>
+        {validationMessage && (
+          <MessageBar
+            messageBarType={MessageBarType.warning}
+            onDismiss={() => setValidationMessage(undefined)}
+          >
+            {validationMessage}
+          </MessageBar>
+        )}
+        {errorMessage && (
+          <MessageBar
+            messageBarType={MessageBarType.error}
+            onDismiss={() => setErrorMessage(undefined)}
+          >
+            {errorMessage}
+          </MessageBar>
+        )}
+        {successMessage && (
+          <MessageBar
+            messageBarType={MessageBarType.success}
+            onDismiss={() => setSuccessMessage(undefined)}
+          >
+            {successMessage}
+          </MessageBar>
+        )}
+
         <TextField
           label="Title"
           value={title}

@@ -19,12 +19,21 @@ import {
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
 import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
+import ConfirmDialog from "../Utility/ConfirmDialog";
 
 const RegisteredListView: React.FC<IListViewProps> = (props) => {
   // State declarations
   const [events, setEvents] = useState<IEventItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  }>({ title: "", message: "", onConfirm: async () => {} });
+  const [successMessage, setSuccessMessage] = useState<string | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
   // Filter events
   const filterEvents = useCallback(
@@ -84,7 +93,9 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
       const timestamp = Date.now();
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`${registrationFilter} and (Id ge 0 or Id eq ${timestamp})`)
+        .items.filter(
+          `${registrationFilter} and (Id ge 0 or Id eq ${timestamp})`
+        )
         .select("EventId", "EventType")
         .top(5000)();
 
@@ -140,42 +151,47 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
   }, [loadEvents]);
 
   // Handle unregister from event
-  const handleDeleteEvent = async (item: IEventItem): Promise<void> => {
-    if (
-      !confirm(`Er du sikker på, at du vil afmeldes "${item.Title}" event?`)
-    ) {
-      return;
-    }
+  const handleDeleteEvent = (item: IEventItem): void => {
+    setConfirmDialogConfig({
+      title: `Afmeld "${item.Title}"`,
+      message: "Er du sikker på, at du vil afmeldes dette event?",
+      onConfirm: async () => {
+        setShowConfirmDialog(false);
+        setSuccessMessage(undefined);
+        setErrorMessage(undefined);
 
-    try {
-      const sp = getSP(props.context);
-      const currentUser = await sp.web.currentUser();
-      const timestamp = Date.now();
-      const registrations = await sp.web.lists
-        .getByTitle("EventRegistrations")
-        .items.filter(
-          `Title eq '${currentUser.Title}' and EventId eq ${item.Id} and (Id ge 0 or Id eq ${timestamp})`
-        )
-        .select("Id")
-        .top(5000)();
+        try {
+          const sp = getSP(props.context);
+          const currentUser = await sp.web.currentUser();
+          const timestamp = Date.now();
+          const registrations = await sp.web.lists
+            .getByTitle("EventRegistrations")
+            .items.filter(
+              `Title eq '${currentUser.Title}' and EventId eq ${item.Id} and (Id ge 0 or Id eq ${timestamp})`
+            )
+            .select("Id")
+            .top(5000)();
 
-      if (registrations.length === 0) {
-        alert("Kunne ikke finde din tilmelding.");
-        return;
-      }
+          if (registrations.length === 0) {
+            setErrorMessage("Kunne ikke finde din tilmelding.");
+            return;
+          }
 
-      await sp.web.lists
-        .getByTitle("EventRegistrations")
-        .items.getById(registrations[0].Id)
-        .delete();
+          await sp.web.lists
+            .getByTitle("EventRegistrations")
+            .items.getById(registrations[0].Id)
+            .delete();
 
-      alert("Du er nu afmeldt eventet!");
+          setSuccessMessage("Du er nu afmeldt eventet!");
 
-      await loadEvents();
-    } catch (error) {
-      console.error("Error unregistering from event:", error);
-      alert("Fejl ved afmelding af event. Prøv igen.");
-    }
+          await loadEvents();
+        } catch (error) {
+          console.error("Error unregistering from event:", error);
+          setErrorMessage("Fejl ved afmelding af event. Prøv igen.");
+        }
+      },
+    });
+    setShowConfirmDialog(true);
   };
 
   const getColumns = (): IColumn[] => {
@@ -300,12 +316,39 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
 
   return (
     <>
+      {successMessage && (
+        <MessageBar
+          messageBarType={MessageBarType.success}
+          onDismiss={() => setSuccessMessage(undefined)}
+        >
+          {successMessage}
+        </MessageBar>
+      )}
+      {errorMessage && (
+        <MessageBar
+          messageBarType={MessageBarType.error}
+          onDismiss={() => setErrorMessage(undefined)}
+        >
+          {errorMessage}
+        </MessageBar>
+      )}
+
       <DetailsList
         items={events}
         columns={getColumns()}
         selectionMode={SelectionMode.none}
         layoutMode={DetailsListLayoutMode.justified}
         isHeaderVisible={true}
+      />
+
+      <ConfirmDialog
+        hidden={!showConfirmDialog}
+        title={confirmDialogConfig.title}
+        message={confirmDialogConfig.message}
+        onConfirm={confirmDialogConfig.onConfirm}
+        onCancel={() => setShowConfirmDialog(false)}
+        confirmText="Afmeld"
+        cancelText="Annuller"
       />
     </>
   );

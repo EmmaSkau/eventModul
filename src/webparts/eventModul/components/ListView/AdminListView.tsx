@@ -18,9 +18,14 @@ import {
   ActionButton,
 } from "@fluentui/react";
 import CreateEvent from "../CreateEvent";
+import ConfirmDialog from "../Utility/ConfirmDialog";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
-import { getFutureEventsSorted, getPastEventsSorted, formatDate } from "../Utility/formatDate";
+import {
+  getFutureEventsSorted,
+  getPastEventsSorted,
+  formatDate,
+} from "../Utility/formatDate";
 import ManageRegistrations from "../ManageRegistrations";
 
 const AdminListView: React.FC<IListViewProps> = (props) => {
@@ -38,6 +43,14 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
   const [manageRegistrationsOpen, setManageRegistrationsOpen] = useState(false);
   const [selectedEventForRegistrations, setSelectedEventForRegistrations] =
     useState<IEventItem | undefined>();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  }>({ title: "", message: "", onConfirm: async () => {} });
+  const [successMessage, setSuccessMessage] = useState<string | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
   // Load registration counts
   const loadRegistrationCounts = useCallback(async (): Promise<void> => {
@@ -48,7 +61,9 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
       const timestamp = Date.now();
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventType eq 'Registered' and (Id ge 0 or Id eq ${timestamp})`)
+        .items.filter(
+          `EventType eq 'Registered' and (Id ge 0 or Id eq ${timestamp})`
+        )
         .select("EventId")
         .top(5000)();
 
@@ -126,8 +141,7 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
       const timestamp = Date.now();
       const items: IEventItem[] = await sp.web.lists
         .getByTitle("EventDB")
-        .items
-        .select(
+        .items.select(
           "Id",
           "Title",
           "Dato",
@@ -137,7 +151,9 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           "Capacity"
         )
         .expand("Administrator")
-        .filter(`Administrator/EMail eq '${currentUserEmail}' and (Id ge 0 or Id eq ${timestamp})`)
+        .filter(
+          `Administrator/EMail eq '${currentUserEmail}' and (Id ge 0 or Id eq ${timestamp})`
+        )
         .top(1000)();
 
       const filteredItems = filterEvents(items);
@@ -174,53 +190,64 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     loadRegistrationCounts().catch(console.error);
   };
 
-  const handleDeleteEvent = async (item: IEventItem): Promise<void> => {
-    if (!confirm(`Er du sikker på, at du vil slette "${item.Title}"?`)) {
-      return;
-    }
+  const handleDeleteEvent = (item: IEventItem): void => {
+    setConfirmDialogConfig({
+      title: `Slet "${item.Title}"`,
+      message:
+        "Er du sikker på, at du vil slette dette event? Alle tilmeldinger og felter vil også blive slettet.",
+      onConfirm: async () => {
+        setShowConfirmDialog(false);
+        setSuccessMessage(undefined);
+        setErrorMessage(undefined);
 
-    try {
-      const sp = getSP(props.context);
+        try {
+          const sp = getSP(props.context);
 
-      // Delete all registrations 
-      const registrations = await sp.web.lists
-        .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${item.Id}`)
-        .select("Id")();
-
-      // Delete all event fields 
-      const eventFields = await sp.web.lists
-        .getByTitle("EventFields")
-        .items.filter(`EventId eq ${item.Id}`)
-        .select("Id")();
-
-      // Delete all registrations and fields in parallel using Promise.all
-      await Promise.all([
-        ...registrations.map((registration) =>
-          sp.web.lists
+          // Delete all registrations
+          const registrations = await sp.web.lists
             .getByTitle("EventRegistrations")
-            .items.getById(registration.Id)
-            .delete()
-        ),
-        ...eventFields.map((field) =>
-          sp.web.lists
+            .items.filter(`EventId eq ${item.Id}`)
+            .select("Id")();
+
+          // Delete all event fields
+          const eventFields = await sp.web.lists
             .getByTitle("EventFields")
-            .items.getById(field.Id)
-            .delete()
-        ),
-      ]);
+            .items.filter(`EventId eq ${item.Id}`)
+            .select("Id")();
 
-      // Delete the event itself
-      await sp.web.lists.getByTitle("EventDB").items.getById(item.Id).delete();
+          // Delete all registrations and fields in parallel using Promise.all
+          await Promise.all([
+            ...registrations.map((registration) =>
+              sp.web.lists
+                .getByTitle("EventRegistrations")
+                .items.getById(registration.Id)
+                .delete()
+            ),
+            ...eventFields.map((field) =>
+              sp.web.lists
+                .getByTitle("EventFields")
+                .items.getById(field.Id)
+                .delete()
+            ),
+          ]);
 
-      alert("Event slettet!");
+          // Delete the event itself
+          await sp.web.lists
+            .getByTitle("EventDB")
+            .items.getById(item.Id)
+            .delete();
 
-      await loadEvents();
-      await loadRegistrationCounts();
-    } catch (error) {
-      console.error("Error deleting event:", error);
-      alert("Fejl ved sletning af event. Prøv igen.");
-    }
+          setSuccessMessage("Event slettet!");
+
+          await loadEvents();
+          await loadRegistrationCounts();
+        } catch (error) {
+          console.error("Error deleting event:", error);
+          setErrorMessage("Fejl ved sletning af event. Prøv igen.");
+        }
+      },
+    });
+    setShowConfirmDialog(true);
   };
 
   const openManageRegistrations = (item: IEventItem): void => {
@@ -327,10 +354,13 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           return (
             <div style={{ display: "flex", gap: "8px" }}>
               <DefaultButton text="Ret" onClick={() => handleEditEvent(item)} />
-              <DefaultButton 
-                text="Slet" 
+              <DefaultButton
+                text="Slet"
                 onClick={() => handleDeleteEvent(item)}
-                styles={{ root: { color: '#a4262c' }, rootHovered: { color: '#8c1c1e' } }}
+                styles={{
+                  root: { color: "#a4262c" },
+                  rootHovered: { color: "#8c1c1e" },
+                }}
               />
             </div>
           );
@@ -360,6 +390,23 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
 
   return (
     <>
+      {successMessage && (
+        <MessageBar
+          messageBarType={MessageBarType.success}
+          onDismiss={() => setSuccessMessage(undefined)}
+        >
+          {successMessage}
+        </MessageBar>
+      )}
+      {errorMessage && (
+        <MessageBar
+          messageBarType={MessageBarType.error}
+          onDismiss={() => setErrorMessage(undefined)}
+        >
+          {errorMessage}
+        </MessageBar>
+      )}
+
       <DetailsList
         items={events}
         columns={getColumns()}
@@ -385,6 +432,16 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
           eventTitle={selectedEventForRegistrations.Title}
         />
       )}
+
+      <ConfirmDialog
+        hidden={!showConfirmDialog}
+        title={confirmDialogConfig.title}
+        message={confirmDialogConfig.message}
+        onConfirm={confirmDialogConfig.onConfirm}
+        onCancel={() => setShowConfirmDialog(false)}
+        confirmText="Slet"
+        cancelText="Annuller"
+      />
     </>
   );
 };

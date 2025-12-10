@@ -17,6 +17,7 @@ import {
   PrimaryButton,
 } from "@fluentui/react";
 import RegisterForEvents from "../RegisterForEvents";
+import ConfirmDialog from "../Utility/ConfirmDialog";
 import { IListViewProps } from "../Utility/IListViewProps";
 import { IEventItem } from "../Utility/IEventItem";
 import { getFutureEventsSorted, formatDate } from "../Utility/formatDate";
@@ -35,6 +36,14 @@ const ListView: React.FC<IListViewProps> = (props) => {
   const [registrationCounts, setRegistrationCounts] = useState<{
     [eventId: number]: number;
   }>({});
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ title: "", message: "", onConfirm: () => {} });
+  const [successMessage, setSuccessMessage] = useState<string | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
   // Load registration counts
   const loadRegistrationCounts = useCallback(async (): Promise<void> => {
@@ -147,7 +156,9 @@ const ListView: React.FC<IListViewProps> = (props) => {
 
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`Title eq '${currentUser.Title}' and (Id ge 0 or Id eq ${timestamp})`)
+        .items.filter(
+          `Title eq '${currentUser.Title}' and (Id ge 0 or Id eq ${timestamp})`
+        )
         .select("EventId", "EventType")
         .top(5000)();
 
@@ -181,7 +192,9 @@ const ListView: React.FC<IListViewProps> = (props) => {
         const timestamp = Date.now();
         const fields = await sp.web.lists
           .getByTitle("EventFields")
-          .items.filter(`EventId eq ${eventId} and (Id ge 0 or Id eq ${timestamp})`)
+          .items.filter(
+            `EventId eq ${eventId} and (Id ge 0 or Id eq ${timestamp})`
+          )
           .select("Id")
           .top(5000)();
 
@@ -215,9 +228,9 @@ const ListView: React.FC<IListViewProps> = (props) => {
         });
 
         if (isWaitlist) {
-          alert("Du er tilføjet til ventelisten!");
+          setSuccessMessage("Du er tilføjet til ventelisten!");
         } else {
-          alert("Du er nu tilmeldt eventet!");
+          setSuccessMessage("Du er nu tilmeldt eventet!");
         }
 
         await loadUserRegistrations();
@@ -225,7 +238,7 @@ const ListView: React.FC<IListViewProps> = (props) => {
         await loadRegistrationCounts();
       } catch (error) {
         console.error("Error registering for event:", error);
-        alert("Fejl ved tilmelding. Prøv igen.");
+        setErrorMessage("Fejl ved tilmelding. Prøv igen.");
       }
     },
     [props.context, loadUserRegistrations, loadEvents, loadRegistrationCounts]
@@ -244,12 +257,18 @@ const ListView: React.FC<IListViewProps> = (props) => {
       setSelectedEventTitle(eventTitle);
     } else {
       const message = isWaitlist
-        ? `Eventet er fuldt booket. Vil du tilføjes til ventelisten for "${eventTitle}"?`
-        : `Vil du tilmelde dig til "${eventTitle}"?`;
+        ? `Eventet er fuldt booket. Vil du tilføjes til ventelisten?`
+        : `Vil du tilmelde dig til dette event?`;
 
-      if (confirm(message)) {
-        await registerUserToEvent(eventId, isWaitlist);
-      }
+      setConfirmDialogConfig({
+        title: eventTitle,
+        message: message,
+        onConfirm: async () => {
+          setShowConfirmDialog(false);
+          await registerUserToEvent(eventId, isWaitlist);
+        },
+      });
+      setShowConfirmDialog(true);
     }
   };
 
@@ -392,6 +411,24 @@ const ListView: React.FC<IListViewProps> = (props) => {
 
   return (
     <>
+      {successMessage && (
+        <MessageBar
+          messageBarType={MessageBarType.success}
+          onDismiss={() => setSuccessMessage(undefined)}
+          dismissButtonAriaLabel="Luk"
+        >
+          {successMessage}
+        </MessageBar>
+      )}
+      {errorMessage && (
+        <MessageBar
+          messageBarType={MessageBarType.error}
+          onDismiss={() => setErrorMessage(undefined)}
+          dismissButtonAriaLabel="Luk"
+        >
+          {errorMessage}
+        </MessageBar>
+      )}
       <DetailsList
         items={events}
         columns={getColumns()}
@@ -409,6 +446,16 @@ const ListView: React.FC<IListViewProps> = (props) => {
           onDismiss={closeRegisterPanel}
         />
       )}
+
+      <ConfirmDialog
+        hidden={!showConfirmDialog}
+        title={confirmDialogConfig.title}
+        message={confirmDialogConfig.message}
+        confirmText="Ja, tilmeld"
+        cancelText="Annuller"
+        onConfirm={confirmDialogConfig.onConfirm}
+        onCancel={() => setShowConfirmDialog(false)}
+      />
     </>
   );
 };

@@ -22,6 +22,7 @@ import {
   SearchBox,
 } from "@fluentui/react";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
+import ConfirmDialog from "./Utility/ConfirmDialog";
 
 interface IManageRegistrationsProps {
   isOpen: boolean;
@@ -52,6 +53,14 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
   >([]);
   const [searchText, setSearchText] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  }>({ title: "", message: "", onConfirm: async () => {} });
+  const [successMessage, setSuccessMessage] = useState<string | undefined>();
+  const [errorMessage, setErrorMessage] = useState<string | undefined>();
 
   const loadRegisteredUsers = useCallback(async (): Promise<void> => {
     try {
@@ -63,14 +72,18 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       const timestamp = Date.now();
       const registered = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${eventId} and EventType ne 'Waitlist' and (Id ge 0 or Id eq ${timestamp})`)
+        .items.filter(
+          `EventId eq ${eventId} and EventType ne 'Waitlist' and (Id ge 0 or Id eq ${timestamp})`
+        )
         .select("Id", "Title", "BrugerId", "EventType")
         .top(5000)();
 
       // Load waitlist users
       const waitlist = await sp.web.lists
         .getByTitle("EventRegistrations")
-        .items.filter(`EventId eq ${eventId} and EventType eq 'Waitlist' and (Id ge 0 or Id eq ${timestamp})`)
+        .items.filter(
+          `EventId eq ${eventId} and EventType eq 'Waitlist' and (Id ge 0 or Id eq ${timestamp})`
+        )
         .select("Id", "Title", "BrugerId", "EventType")
         .top(5000)();
 
@@ -92,25 +105,32 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
   }, [isOpen, loadRegisteredUsers]);
 
   const removeUser = useCallback(
-    async (registrationId: number): Promise<void> => {
-      if (!confirm("Er du sikker p\u00e5, at du vil fjerne denne bruger?")) {
-        return;
-      }
+    (registrationId: number, userName: string): void => {
+      setConfirmDialogConfig({
+        title: `Fjern ${userName}`,
+        message: "Er du sikker på, at du vil fjerne denne bruger?",
+        onConfirm: async () => {
+          setShowConfirmDialog(false);
+          setSuccessMessage(undefined);
+          setErrorMessage(undefined);
 
-      try {
-        const sp = getSP(context);
+          try {
+            const sp = getSP(context);
 
-        await sp.web.lists
-          .getByTitle("EventRegistrations")
-          .items.getById(registrationId)
-          .delete();
+            await sp.web.lists
+              .getByTitle("EventRegistrations")
+              .items.getById(registrationId)
+              .delete();
 
-        alert("Bruger fjernet!");
-        await loadRegisteredUsers();
-      } catch (error) {
-        console.error("Error removing user:", error);
-        alert("Fejl ved fjernelse af bruger. Pr\u00f8v igen.");
-      }
+            setSuccessMessage("Bruger fjernet!");
+            await loadRegisteredUsers();
+          } catch (error) {
+            console.error("Error removing user:", error);
+            setErrorMessage("Fejl ved fjernelse af bruger. Prøv igen.");
+          }
+        },
+      });
+      setShowConfirmDialog(true);
     },
     [context, loadRegisteredUsers]
   );
@@ -153,6 +173,9 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       userName: string,
       eventType: string = "Registered"
     ): Promise<void> => {
+      setSuccessMessage(undefined);
+      setErrorMessage(undefined);
+
       try {
         const sp = getSP(context);
 
@@ -163,7 +186,7 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
           .select("Id")();
 
         if (existing.length > 0) {
-          alert("Denne bruger er allerede tilmeldt eventet.");
+          setErrorMessage("Denne bruger er allerede tilmeldt eventet.");
           return;
         }
 
@@ -179,14 +202,14 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
           Submitted: new Date().toISOString(),
         });
 
-        alert("Bruger tilmeldt!");
+        setSuccessMessage("Bruger tilmeldt!");
         setShowAddUser("");
         setSearchText("");
         setSearchResults([]);
         await loadRegisteredUsers();
       } catch (error) {
         console.error("Error adding user:", error);
-        alert("Fejl ved tilmelding af bruger. Prøv igen.");
+        setErrorMessage("Fejl ved tilmelding af bruger. Prøv igen.");
       }
     },
     [context, eventId, loadRegisteredUsers]
@@ -214,7 +237,7 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
             <IconButton
               iconProps={{ iconName: "Delete" }}
               title="Fjern bruger"
-              onClick={() => removeUser(item.Id)}
+              onClick={() => removeUser(item.Id, item.Title)}
             />
           );
         },
@@ -244,6 +267,23 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
       closeButtonAriaLabel="Luk"
     >
       <Stack tokens={{ childrenGap: 15 }}>
+        {successMessage && (
+          <MessageBar
+            messageBarType={MessageBarType.success}
+            onDismiss={() => setSuccessMessage(undefined)}
+          >
+            {successMessage}
+          </MessageBar>
+        )}
+        {errorMessage && (
+          <MessageBar
+            messageBarType={MessageBarType.error}
+            onDismiss={() => setErrorMessage(undefined)}
+          >
+            {errorMessage}
+          </MessageBar>
+        )}
+
         {isLoading && <Spinner size={SpinnerSize.large} label="Indlæser..." />}
 
         {error && (
@@ -404,6 +444,16 @@ const ManageRegistrations: React.FC<IManageRegistrationsProps> = (props) => {
           </>
         )}
       </Stack>
+
+      <ConfirmDialog
+        hidden={!showConfirmDialog}
+        title={confirmDialogConfig.title}
+        message={confirmDialogConfig.message}
+        onConfirm={confirmDialogConfig.onConfirm}
+        onCancel={() => setShowConfirmDialog(false)}
+        confirmText="Fjern"
+        cancelText="Annuller"
+      />
     </Panel>
   );
 };
