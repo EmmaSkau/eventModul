@@ -157,7 +157,7 @@ const ListView: React.FC<IListViewProps> = (props) => {
       const registrations = await sp.web.lists
         .getByTitle("EventRegistrations")
         .items.filter(
-          `Title eq '${currentUser.Title}' and (Id ge 0 or Id eq ${timestamp})`
+          `BrugerId eq ${currentUser.Id} and (Id ge 0 or Id eq ${timestamp})`
         )
         .select("EventId", "EventType")
         .top(5000)();
@@ -277,7 +277,9 @@ const ListView: React.FC<IListViewProps> = (props) => {
     setRegisterPanelOpen(false);
     setSelectedEventId(undefined);
     setSelectedEventTitle(undefined);
+    loadUserRegistrations().catch(console.error);
     loadEvents().catch(console.error);
+    loadRegistrationCounts().catch(console.error);
   };
 
   const getColumns = (): IColumn[] => {

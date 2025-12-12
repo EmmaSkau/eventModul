@@ -31,6 +31,13 @@ import { IEventItem } from "../components/Utility/IEventItem";
 import AddFieldDialog, { ICustomField } from "./SpecialFields";
 import styles from "./EventModul.module.scss";
 
+interface IEventFieldItem {
+  Id: number;
+  Title: string;
+  FeltType: "text" | "multipleChoice";
+  Valgmuligheder: string | undefined;
+}
+
 interface ICreateEventProps {
   onClose?: () => void;
   context: WebPartContext;
@@ -149,7 +156,15 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
           .select("Id", "Title", "FeltType", "Valgmuligheder", "P_x00e5_kr_x00e6_vet")
           .top(5000)();
         
-        setCustomFields(data);
+        // Map SharePoint data to ICustomField interface
+        const mappedFields: ICustomField[] = data.map((item: IEventFieldItem) => ({
+          id: item.Id.toString(),
+          fieldName: item.Title,
+          fieldType: item.FeltType,
+          options: item.Valgmuligheder ? JSON.parse(item.Valgmuligheder) : undefined,
+        }));
+        
+        setCustomFields(mappedFields);
       } catch (error) {
         console.error("Error loading custom fields:", error);
       }

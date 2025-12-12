@@ -83,7 +83,7 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
       const currentUser = await sp.web.currentUser();
 
       // Build filter based on waitlisted toggle
-      let registrationFilter = `Title eq '${currentUser.Title}'`;
+      let registrationFilter = `BrugerId eq ${currentUser.Id}`;
       if (props.waitlisted) {
         registrationFilter += " and EventType eq 'Waitlist'";
       } else if (props.registered) {
@@ -167,7 +167,7 @@ const RegisteredListView: React.FC<IListViewProps> = (props) => {
           const registrations = await sp.web.lists
             .getByTitle("EventRegistrations")
             .items.filter(
-              `Title eq '${currentUser.Title}' and EventId eq ${item.Id} and (Id ge 0 or Id eq ${timestamp})`
+              `BrugerId eq ${currentUser.Id} and EventId eq ${item.Id} and (Id ge 0 or Id eq ${timestamp})`
             )
             .select("Id")
             .top(5000)();
