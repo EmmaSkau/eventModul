@@ -42,13 +42,6 @@ const AdminPage: React.FC<IAdminPageProps> = (props) => {
 
   const handleEventCreated = useCallback((): void => {
     setRefreshTrigger((prev) => prev + 1);
-
-    const refreshTimes = [2000, 4000, 6000]; // Refresh at 2s, 4s, and 6s
-    refreshTimes.forEach((delay) => {
-      setTimeout(() => {
-        setRefreshTrigger((prev) => prev + 1);
-      }, delay);
-    });
   }, []);
 
   const handleCloseAdminPage = useCallback((): void => {

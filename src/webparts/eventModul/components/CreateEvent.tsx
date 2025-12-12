@@ -166,6 +166,33 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
     }
   }, [eventToEdit?.Id, loadCustomFields]);
 
+  // Reset messages when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      setSuccessMessage(undefined);
+      setErrorMessage(undefined);
+      setValidationMessage(undefined);
+      
+      // If opening to create new event, clear all fields
+      if (!eventToEdit) {
+        setTitle("");
+        setStartDate(undefined);
+        setStartTime(undefined);
+        setEndDate(undefined);
+        setEndTime(undefined);
+        setSameDate(false);
+        setSelectedLocation(undefined);
+        setMaxParticipants(undefined);
+        setCustomFields([]);
+        setIsOnline(false);
+        setOnlineLink("");
+        setSelectedUsers([]);
+        setUserSearchText("");
+        setUserSearchResults([]);
+      }
+    }
+  }, [isOpen, eventToEdit]);
+
   // Update form when eventToEdit changes
   useEffect(() => {
     if (eventToEdit) {
@@ -230,6 +257,9 @@ const CreateEvent: React.FC<ICreateEventProps> = (props) => {
       setSelectedUsers([]);
       setUserSearchText("");
       setUserSearchResults([]);
+      setSuccessMessage(undefined);
+      setErrorMessage(undefined);
+      setValidationMessage(undefined);
     }
   }, [eventToEdit, context]);
 

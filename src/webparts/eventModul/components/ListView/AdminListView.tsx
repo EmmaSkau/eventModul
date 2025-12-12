@@ -168,16 +168,11 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     }
   }, [props.context, filterEvents]);
 
-  // Load data on mount
+  // Load data on mount and when filters change
   useEffect(() => {
     loadRegistrationCounts().catch(console.error);
     loadEvents().catch(console.error);
-  }, []);
-
-  // Reload when filters change
-  useEffect(() => {
-    loadEvents().catch(console.error);
-  }, [loadEvents]);
+  }, [props.startDate, props.endDate, props.selectedLocation, props.showPastEvents]);
 
   // Event handlers
   const handleEditEvent = (item: IEventItem): void => {
@@ -188,7 +183,6 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
   const handleCloseEditPanel = (): void => {
     setEditPanelOpen(false);
     setSelectedEventForEdit(undefined);
-    loadRegistrationCounts().catch(console.error);
   };
 
   const handleDeleteEvent = (item: IEventItem): void => {
@@ -260,6 +254,7 @@ const AdminListView: React.FC<IListViewProps> = (props) => {
     setManageRegistrationsOpen(false);
     setSelectedEventForRegistrations(undefined);
     loadRegistrationCounts().catch(console.error);
+    loadEvents().catch(console.error);
   };
 
   const getColumns = (): IColumn[] => {
